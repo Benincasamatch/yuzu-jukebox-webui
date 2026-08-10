@@ -192,15 +192,21 @@ cd android && ./gradlew assembleDebug       # 需 ANDROID_HOME 或 local.propert
       （服务端 OIDC 启用时出现）、PKCE 回调在 App 启动时识别（redirect_uri = 应用根，
       code/state 落在 location.search）、请求携带 Zitadel roles scope、大厅身份区退出登录
 - [x] Phase E 播放器外壳重构：大厅陈列页/房间页 → 常驻外壳（侧导航+底部播放栏+
-      队列抽屉），房间降级为设备式切换弹窗；首页漫游（一键电台卡/歌单浏览/
-      本房热门 stats/最近播放 history）；房间治理迁入 /admin；推荐 feed 与
-      非 controller 开电台为占位符，等后端端点（见服务端 TODO「WebUI 漫游体验配套」）
+      队列抽屉），房间降级为设备式切换弹窗；首页漫游（推荐 feed
+      recommendations/一键电台卡/歌单浏览/本房热门 stats/最近播放 history）；
+      房间治理迁入 /admin；非 controller 开电台为占位符，等后端端点
 
 ## 服务端协同
 
 服务端仓库 `~/projects/yuzu-jukebox` 由独立维护批次演进（spec 先行，非破坏性扩展）。
 已完成：批量 queue.add（原子，ack 回 entry_ids）、playlist item move、
 OIDC 多 audience（extra_client_ids）、rooms 实况摘要、requester_name 快照。
+feat/yuzutify-frontend-backend 批次已采纳（2026-08）：GET /recommendations
+（首页推荐 feed）、GET /artists/{name}（/artist/:name 档案页，NowPlayingPanel
+艺人名链接）、GET /providers/{id}/radio-catalog（RadioPanel 动态目录，501/404
+= 无目录能力）、PATCH /playlists/{id}（歌单元数据/pin，创建者或 media_admin，
+绑定歌单改名 409）、history/stats/hot 的 artist 快照字段、PlaylistInfo.pinned。
+外部歌单查看 = /radio/tracks 物化（spec 明确 playlist 不经 searchEntity 钻取）。
 IdP 侧待办：新增 PKCE(User-Agent)应用 → 其 client_id 加入服务端
 `oidc.extra_client_ids`；roles 进 ID token 用 Application 级 Token Settings
 或 scope `urn:zitadel:iam:org:projects:roles`（WebUI 授权请求已自动携带后者）。
