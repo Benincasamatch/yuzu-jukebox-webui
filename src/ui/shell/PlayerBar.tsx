@@ -4,11 +4,11 @@
  * 图标统一走 lucide，不用文本字符（不同终端字体下渲染不一致）。
  * 未入房时整条降级为「选择房间」入口；入房但空闲时提示去点歌。
  */
-import { useEffect, useReducer, useState, type JSX } from 'react';
+import { useEffect, useReducer, useRef, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DropdownMenu } from 'radix-ui';
-import { Heart, ListMusic, Pause, Play, Plus } from 'lucide-react';
-import { api, client } from '../../app/session';
+import { Heart, ListMusic, Pause, Play, Plus, SkipForward } from 'lucide-react';
+import { api, client, roomStore } from '../../app/session';
 import { audio, renderer } from '../../app/player';
 import type { AccountPlaylist } from '../../api/types';
 import type { Playback } from '../../protocol/types';
@@ -113,7 +113,7 @@ export function positionOf(playback: Playback): number {
 export function PlayerBar(): JSX.Element {
   const { t } = useTranslation();
   const state = useRoomState();
-  const { nameOf, queueOpen, setQueueOpen, setRoomsOpen } = useShell();
+  const { canControl, nameOf, queueOpen, setQueueOpen, setRoomsOpen } = useShell();
   const providers = useProviders();
   const { show, showError } = useToast();
   const [playerOpen, setPlayerOpen] = useState(false);
@@ -139,14 +139,26 @@ export function PlayerBar(): JSX.Element {
   const current = playback.current;
   // 个人暂停（前端暂停）：仅本客户端静默，房间继续播放；恢复时对齐房间位置。
   const [personalPaused, setPersonalPaused] = useState(() => renderer.isPersonalPaused);
+  const [seeking, setSeeking] = useState(false);
+  const [seekPos, setSeekPos] = useState(0);
+  const seekingRef = useRef(false);
   useEffect(() => {
     // 离房/换房：内核渲染空闲态时清除标志，这里同步按钮态。
     setPersonalPaused(renderer.isPersonalPaused);
   }, [state.roomId]);
-  const pos = personalPaused && current
+  useEffect(() => {
+    // 换曲或失去控制权时清除本地拖动值，回到服务端播放五元组。
+    seekingRef.current = false;
+    setSeeking(false);
+  }, [canControl, trackRef]);
+  // 个人暂停时进度冻结在本地可闻位置（房间照走，恢复时再对齐房间）
+  const livePos = personalPaused && current
     ? audio.currentTime * 1_000
     : positionOf(playback);
-  const pct = current && current.duration_ms > 0 ? (pos / current.duration_ms) * 100 : 0;
+  const pos = seeking ? seekPos : livePos;
+  const pct = current && current.duration_ms > 0
+    ? Math.max(0, Math.min(100, (pos / current.duration_ms) * 100))
+    : 0;
 
   // 喜欢/加歌单：仅当当前曲目的 provider 凭据归我所有且报告对应能力时出现
   const currentRef = current?.track_ref;
@@ -194,7 +206,7 @@ export function PlayerBar(): JSX.Element {
 
   if (!state.roomId) {
     return (
-      <div className="flex h-16 flex-none items-center justify-between gap-4 border-t border-hairline bg-panel px-4">
+      <div className="flex h-18 flex-none items-center justify-between gap-4 bg-transparent px-4">
         <span className="text-[13px] text-faint">{t('shell.noRoomHint')}</span>
         <button
           type="button"
@@ -209,9 +221,9 @@ export function PlayerBar(): JSX.Element {
   }
 
   return (
-    <div className="grid h-18 flex-none grid-cols-[1fr_minmax(0,1.6fr)_1fr] items-center gap-4 border-t border-hairline bg-panel px-4">
+    <div className="grid h-18 flex-none grid-cols-[1fr_minmax(0,1.4fr)_1fr] items-center gap-4 bg-transparent px-4">
       {/* 左：当前曲目 */}
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 items-center gap-2">
         {current ? (
           <button
             type="button"
@@ -220,13 +232,21 @@ export function PlayerBar(): JSX.Element {
             className="flex min-w-0 items-center gap-3 text-left"
           >
             {current.cover_url ? (
-              <img src={coverSrc(current.cover_url)} alt="" className="h-11 w-11 flex-none rounded object-cover" />
+              <img
+                src={coverSrc(current.cover_url)}
+                alt=""
+                className="h-14 w-14 flex-none rounded-md object-cover"
+              />
             ) : (
-              <div className="h-11 w-11 flex-none rounded bg-panel-2" />
+              <div className="h-14 w-14 flex-none rounded-md bg-panel-2" />
             )}
             <span className="min-w-0">
-              <span className="block truncate text-[13.5px]">{current.title}</span>
-              <span className="block truncate text-xs text-muted">{current.artist}</span>
+              <span className="block truncate text-[14px] text-paper hover:underline">
+                {current.title}
+              </span>
+              <span className="block truncate text-[12px] text-muted hover:underline">
+                {current.artist}
+              </span>
             </span>
           </button>
         ) : (
@@ -252,7 +272,7 @@ export function PlayerBar(): JSX.Element {
                 })
                 .catch(showError);
             }}
-            className={`grid h-8 w-8 flex-none place-items-center rounded-full hover:bg-[var(--hover)] disabled:opacity-100 ${
+            className={`grid h-8 w-8 flex-none place-items-center rounded-full transition hover:bg-[var(--hover)] disabled:opacity-100 ${
               liked ? 'text-accent' : 'text-muted hover:text-paper'
             }`}
           >
@@ -265,63 +285,116 @@ export function PlayerBar(): JSX.Element {
         {current && <SimilarButton />}
       </div>
 
-      {/* 中：进度（统一展示；房间控制已移至房间切换面板） */}
-      <div className="flex min-w-0 flex-col items-center gap-1">
+      {/* 中：个人传输控制 + 房间进度 */}
+      <div className="flex min-w-0 flex-col items-center gap-1.5">
         {current && (
           <>
+            <div className="flex h-9 items-center justify-center gap-3">
+              {canControl && (
+                <button
+                  type="button"
+                  title={t('room.skip')}
+                  onClick={() => void roomStore.skip().catch(showError)}
+                  className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper"
+                >
+                  <SkipForward className="h-4 w-4 fill-current" />
+                </button>
+              )}
+              <button
+                type="button"
+                title={personalPaused ? t('room.personalResume') : t('room.personalPause')}
+                onClick={() => {
+                  if (personalPaused) {
+                    renderer.resumePersonal();
+                  } else {
+                    renderer.pausePersonal();
+                  }
+                  setPersonalPaused(renderer.isPersonalPaused);
+                }}
+                className="grid h-9 w-9 place-items-center rounded-full bg-paper text-hall transition-transform hover:scale-105"
+              >
+                {personalPaused ? (
+                  <Play className="ml-0.5 h-4 w-4 fill-current" />
+                ) : (
+                  <Pause className="h-4 w-4 fill-current" />
+                )}
+              </button>
+            </div>
             <div className="flex w-full items-center gap-2.5">
-              <span className="flex-none font-mono text-[11px] text-muted tabular-nums">{formatMs(pos)}</span>
-              <div className="h-[3px] flex-1 overflow-hidden rounded bg-[var(--rail)]">
-                <div className="progress-glide h-full rounded bg-accent" style={{ width: `${pct}%` }} />
+              <span className="flex-none text-[11px] text-muted tabular-nums">{formatMs(pos)}</span>
+              <div className="group relative flex h-3 min-w-0 flex-1 items-center">
+                <div className="h-[3px] w-full overflow-hidden rounded-full bg-[var(--rail)]">
+                  <div
+                    className="h-full rounded-full bg-paper transition-colors group-hover:bg-accent group-focus-within:bg-accent"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 rounded-full bg-paper opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                  style={{ left: `${pct}%` }}
+                />
+                {canControl && (
+                  <input
+                    type="range"
+                    min={0}
+                    max={Math.max(1, current.duration_ms)}
+                    step={1}
+                    value={Math.max(0, Math.min(current.duration_ms, pos))}
+                    aria-label={t('room.nowPlaying')}
+                    disabled={current.duration_ms <= 0}
+                    onPointerDown={(event) => {
+                      if (!event.isPrimary || event.button !== 0) return;
+                      seekingRef.current = true;
+                      setSeekPos(pos);
+                      setSeeking(true);
+                      event.currentTarget.setPointerCapture(event.pointerId);
+                    }}
+                    onChange={(event) => {
+                      const next = Number(event.currentTarget.value);
+                      setSeekPos(next);
+                      if (!seekingRef.current) {
+                        void roomStore.seek(Math.round(next)).catch(showError);
+                      }
+                    }}
+                    onPointerUp={(event) => {
+                      if (!seekingRef.current) return;
+                      const next = Number(event.currentTarget.value);
+                      seekingRef.current = false;
+                      setSeekPos(next);
+                      setSeeking(false);
+                      void roomStore.seek(Math.round(next)).catch(showError);
+                    }}
+                    onPointerCancel={() => {
+                      seekingRef.current = false;
+                      setSeeking(false);
+                    }}
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0 disabled:cursor-default"
+                  />
+                )}
               </div>
-              <span className="flex-none font-mono text-[11px] text-muted tabular-nums">
+              <span className="flex-none text-[11px] text-muted tabular-nums">
                 {formatMs(current.duration_ms)}
               </span>
             </div>
-            {personalPaused && (
-              <p className="text-[10.5px] text-faint">{t('room.personalPausedHint')}</p>
-            )}
           </>
         )}
       </div>
 
-      {/* 右：个人暂停 / 音量 / 队列 / 房间切换 */}
+      {/* 右：队列 / 音量 / 房间切换（Now Playing 常驻右槽位，入口不在此处） */}
       <div className="flex min-w-0 items-center justify-end gap-2">
-        {current && (
-          <button
-            type="button"
-            title={personalPaused ? t('room.personalResume') : t('room.personalPause')}
-            onClick={() => {
-              if (personalPaused) {
-                renderer.resumePersonal();
-              } else {
-                renderer.pausePersonal();
-              }
-              setPersonalPaused(renderer.isPersonalPaused);
-            }}
-            className={`grid h-8.5 w-8.5 flex-none place-items-center rounded-full hover:bg-[var(--hover)] ${
-              personalPaused ? 'text-accent' : 'text-muted hover:text-paper'
-            }`}
-          >
-            {personalPaused ? (
-              <Play className="ml-0.5 h-4 w-4 fill-current" />
-            ) : (
-              <Pause className="h-4 w-4 fill-current" />
-            )}
-          </button>
-        )}
-        <VolumeControl className="max-lg:hidden" />
         <button
           type="button"
           title={t('shell.queue')}
           data-queue-toggle
           onClick={() => setQueueOpen(!queueOpen)}
-          className={`grid h-8.5 w-8.5 flex-none place-items-center rounded-md hover:bg-[var(--hover)] ${
+          className={`grid h-8.5 w-8.5 flex-none place-items-center rounded-full transition hover:bg-[var(--hover)] ${
             queueOpen ? 'text-accent' : 'text-muted hover:text-paper'
           }`}
         >
           <ListMusic className="h-4 w-4" />
         </button>
+        <VolumeControl className="max-lg:hidden" />
         <RoomSwitcher />
       </div>
 

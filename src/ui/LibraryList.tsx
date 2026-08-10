@@ -5,14 +5,26 @@ import type { PlaylistInfo } from '../api/types';
 import { coverSrc } from './cover';
 
 /** 歌单封面：后端 cover_url 恒为代理路径，缺失时图标占位。 */
-export function PlaylistCover({ playlist }: { playlist: PlaylistInfo }) {
+export function PlaylistCover({
+  playlist,
+  className = 'h-10 w-10',
+}: {
+  playlist: PlaylistInfo;
+  className?: string;
+}) {
   if (playlist.cover_url) {
     return (
-      <img src={coverSrc(playlist.cover_url)} alt="" className="h-10 w-10 flex-none rounded object-cover" />
+      <img
+        src={coverSrc(playlist.cover_url)}
+        alt=""
+        className={`${className} flex-none rounded-md object-cover`}
+      />
     );
   }
   return (
-    <span className="grid h-10 w-10 flex-none place-items-center rounded bg-panel-2 text-faint">
+    <span
+      className={`${className} grid flex-none place-items-center rounded-md bg-panel-2 text-faint`}
+    >
       <ListMusic className="h-4 w-4" />
     </span>
   );

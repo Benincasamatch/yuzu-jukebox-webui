@@ -8,26 +8,28 @@
    3. glow（封面辉光）：封面取色，与前两轴隔离
    ============================================================ */
 :root {
-  --accent: #E3B93C;
+  --accent: #1DB954;
   --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
   --accent-line: color-mix(in srgb, var(--accent) 40%, transparent);
-  --on-accent: #1A1607;
+  --on-accent: #0A1F10;
   --ring: color-mix(in srgb, var(--accent) 55%, transparent);
 
-  --font-display: "Fraunces", "Songti SC", "Noto Serif SC", serif;
+  /* Spotify 复刻：无衬线，display 轴与 body 同族，标题靠字重分层 */
+  --font-display: -apple-system, "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-body: -apple-system, "PingFang SC", "Hiragino Sans GB",
     "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  --radius: 6px;
+  --radius: 8px;
   --speed: 240ms;
 
   /* 壳高变量：QueueDrawer / BatteryOptBanner 均 portal 到 body，
      无法继承壳容器上的变量，故在 :root 定义（移动端值见下方媒体查询）。
      --header-h = 顶栏总高（含 border 与安全区）；--chrome-b = 视口底到
      底部 chrome 顶部的距离（播放条 + TabBar，含 border 与安全区）。 */
-  --header-h: 3.6875rem; /* 桌面顶栏 59px（账户触发钮 38 + py-2.5 20 + border 1） */
-  --chrome-b: 4.5rem; /* 桌面播放栏 72px（h-18 含 border，实测） */
+  --header-h: 3.5rem; /* 桌面全局顶栏 56px（h-10 控件 + py-2） */
+  --chrome-b: 4.5rem; /* 桌面播放栏 72px（h-18，实测） */
 }
 
 @media (width < 48rem) {
@@ -39,15 +41,15 @@
 
 :root[data-scheme="dark"] {
   color-scheme: dark;
-  --hall: #131210;
-  --panel: #1C1A17;
-  --panel-2: #24211B;
-  --hairline: #2A2723;
-  --paper: #EDE8DF;
-  --muted: #8B857A;
-  --faint: #5C574E;
-  --rail: rgba(255, 255, 255, 0.09);
-  --hover: rgba(255, 255, 255, 0.055);
+  --hall: #000000;
+  --panel: #121212;
+  --panel-2: #1F1F1F;
+  --hairline: #2A2A2A;
+  --paper: #FFFFFF;
+  --muted: #B3B3B3;
+  --faint: #727272;
+  --rail: rgba(255, 255, 255, 0.1);
+  --hover: rgba(255, 255, 255, 0.07);
   --cover-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
   --toast-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   --glow-opacity: 0.5;
@@ -160,6 +162,17 @@ input.search-input:focus-visible {
 /* 进度条秒间滑行（对齐 1s 校偏节拍） */
 .progress-glide {
   transition: width 1s linear;
+}
+
+/* ---------- 全屏舞台动效（prefers-reduced-motion 下全部被下方规则关闭） ---------- */
+/* 极光团漂移：两团反向错相位，制造缓慢呼吸的环境光 */
+@keyframes stage-drift-a {
+  from { transform: translate3d(-6%, -4%, 0) scale(1); }
+  to { transform: translate3d(7%, 6%, 0) scale(1.15); }
+}
+@keyframes stage-drift-b {
+  from { transform: translate3d(5%, 7%, 0) scale(1.1); }
+  to { transform: translate3d(-7%, -5%, 0) scale(0.95); }
 }
 
 /* ---------- 复选框风格化 ---------- */

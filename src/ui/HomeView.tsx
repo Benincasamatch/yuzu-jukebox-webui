@@ -1,16 +1,15 @@
 /**
- * 首页 = 漫游区：一键电台（provider 源目录驱动，改版方向待二次调研）、
- * 全局热门、本房热门。热门均为封面卡横向展示；歌单已在左侧曲库、
- * 点歌历史已折叠进账户菜单，不再重复呈现。
+ * 首页 = 漫游区：源目录驱动的电台与集合、全局热门、最近播放和本房热门。
+ * 封面 shelf 一律单行横向滚动、只摆第一分页；「显示全部」跳 /shelf/:kind 全览页。
  */
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import type { HotTrack, StatsEntry } from '../api/types';
+import type { HistoryEntry, HotTrack, StatsEntry } from '../api/types';
 import { api, roomStore } from '../app/session';
+import { ActivityCard } from './ActivityCard';
+import { formatClock } from './format';
 import { useIdentity, useProviders, useRoomState } from './hooks';
-import { coverSrc } from './cover';
-import { CoverThumb } from './CoverThumb';
 import { SOURCE_DESC_KEYS } from './radioSources';
 import { useToast } from './toast';
 import { useShell } from './AppShell';
@@ -20,16 +19,14 @@ export default function HomeView(): JSX.Element {
   const identity = useIdentity();
 
   return (
-    <div className="view-enter mx-auto max-w-5xl px-4 pt-4 pb-10 md:px-7 md:pt-7">
-      <div className="mb-1.5 font-mono text-[11px] tracking-[0.14em] uppercase text-faint">
-        {t('home.eyebrow')}
-      </div>
-      <h1 className="mb-8 font-display text-4xl font-semibold">
+    <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
+      <h1 className="text-[32px] font-bold text-paper">
         {t('lobby.greeting', { period: t(greetingKey()), name: identity?.name ?? '' })}
       </h1>
 
       <RadioSection />
       <HotSection />
+      <RecentSection />
       <RoomActivitySections />
     </div>
   );
@@ -44,9 +41,42 @@ function greetingKey(): string {
   return 'lobby.periodEvening';
 }
 
-function SectionTitle({ children }: { children: string }) {
+function ShelfHeader({
+  title,
+  actionLabel,
+  actionDisabled = false,
+  onAction,
+}: {
+  title: string;
+  actionLabel?: string;
+  actionDisabled?: boolean;
+  onAction?: () => void;
+}): JSX.Element {
   return (
-    <h2 className="mt-9 mb-3 font-mono text-[11px] tracking-[0.14em] uppercase text-faint">{children}</h2>
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <h2 className="text-2xl font-bold text-paper">{title}</h2>
+      {actionLabel && onAction && (
+        <button
+          type="button"
+          disabled={actionDisabled}
+          onClick={onAction}
+          className="text-[13px] font-semibold text-muted hover:underline disabled:opacity-40"
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+const shelfGridClass = 'grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5';
+const collectionCardClass =
+  'rounded-lg bg-[var(--hover)] p-4 text-left transition-colors hover:bg-panel-2 disabled:opacity-40';
+
+/** 封面 shelf 单行：定宽卡片横向滚动（Spotify 首页行形态），卡宽由卡片 className 控制。 */
+function ShelfRow({ children }: { children: ReactNode }): JSX.Element {
+  return (
+    <div className="no-scrollbar -mx-2 flex gap-2 overflow-x-auto px-2 pb-1">{children}</div>
   );
 }
 
@@ -69,12 +99,12 @@ function RadioSection(): JSX.Element | null {
     })),
   );
 
-  // 回归 provider 侧原始语义：finite 无参源（每日推荐/新歌等）是每日/定期刷新的
-  // 曲目集合 → 进集合页（复用曲库歌单展示）；无限流（私人FM/心动）才是真电台 → 直接开。
-  // simi 是「当前曲目的相似检索」，入口在播放控制区（相似小窗），不在此陈列；
-  // 带参源（top:<id>/fav:<id>）首页无参数上下文，不陈列。
-  const collections = catalog.filter((e) => e.source.finite && !e.source.arg);
-  const radios = catalog.filter((e) => !e.source.finite && e.source.spec !== 'simi');
+  // finite 无参源是定期刷新的曲目集合，进入集合页；无限流才直接启动电台。
+  // simi 由播放控制区提供；带参源在首页没有参数上下文，不陈列。
+  const collections = catalog.filter((entry) => entry.source.finite && !entry.source.arg);
+  const radios = catalog.filter(
+    (entry) => !entry.source.finite && entry.source.spec !== 'simi',
+  );
 
   const start = (source: string) => {
     if (!state.roomId) {
@@ -97,17 +127,15 @@ function RadioSection(): JSX.Element | null {
 
   if (collections.length === 0 && radios.length === 0) return null;
 
-  const cardClass =
-    'rounded-lg border border-hairline bg-panel px-4 py-4 text-left transition-colors hover:border-accent hover:bg-panel-2 disabled:opacity-40';
-
   return (
     <>
       {collections.length > 0 && (
-        <section>
-          <SectionTitle>{t('home.collectionsTitle')}</SectionTitle>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="mt-10">
+          <ShelfHeader title={t('home.collectionsTitle')} />
+          <div className={shelfGridClass}>
             {collections.map(({ providerId, source, credentialOk }) => {
               const usable = !source.requires_credential || credentialOk;
+              const descKey = SOURCE_DESC_KEYS[source.spec];
               return (
                 <button
                   key={`${providerId}:${source.spec}`}
@@ -117,11 +145,13 @@ function RadioSection(): JSX.Element | null {
                   onClick={() =>
                     navigate(`/source/${encodeURIComponent(`${providerId}:${source.spec}`)}`)
                   }
-                  className={cardClass}
+                  className={collectionCardClass}
                 >
-                  <div className="font-display text-[15px] font-semibold">{source.name ?? source.spec}</div>
-                  {SOURCE_DESC_KEYS[source.spec] && (
-                    <div className="mt-1 text-xs text-muted">{t(SOURCE_DESC_KEYS[source.spec])}</div>
+                  <div className="text-[15px] font-semibold text-paper">
+                    {source.name ?? source.spec}
+                  </div>
+                  {descKey && (
+                    <div className="mt-1 text-[13px] text-muted">{t(descKey)}</div>
                   )}
                 </button>
               );
@@ -131,12 +161,12 @@ function RadioSection(): JSX.Element | null {
       )}
 
       {radios.length > 0 && (
-        <section>
-          <SectionTitle>{t('home.radioTitle')}</SectionTitle>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <section className="mt-10">
+          <ShelfHeader title={t('home.radioTitle')} />
+          <div className={shelfGridClass}>
             {radios.map(({ providerId, source, credentialOk, owned }) => {
               const usable = !source.requires_credential || credentialOk;
-              // 心动模式绑定凭据账号的喜欢列表：非 owner 可开，但先说明基底是谁的口味
+              // 心动模式绑定凭据账号的喜欢列表：非 owner 可开，但先说明基底是谁的口味。
               const descKey =
                 source.spec === 'heart' && source.requires_credential && !owned
                   ? 'radio.heartBoundHint'
@@ -148,10 +178,14 @@ function RadioSection(): JSX.Element | null {
                   disabled={busy || !usable}
                   title={usable ? undefined : t('radio.credentialNeed')}
                   onClick={() => start(`${providerId}:${source.spec}`)}
-                  className={cardClass}
+                  className={collectionCardClass}
                 >
-                  <div className="font-display text-[15px] font-semibold">{source.name ?? source.spec}</div>
-                  {descKey && <div className="mt-1 text-xs text-muted">{t(descKey)}</div>}
+                  <div className="text-[15px] font-semibold text-paper">
+                    {source.name ?? source.spec}
+                  </div>
+                  {descKey && (
+                    <div className="mt-1 text-[13px] text-muted">{t(descKey)}</div>
+                  )}
                 </button>
               );
             })}
@@ -165,15 +199,14 @@ function RadioSection(): JSX.Element | null {
   );
 }
 
-// ---------- 全局热门（跨房间 play_history 聚合，分页） ----------
+// ---------- 全局热门（跨房间 play_history 聚合；首页只陈列第一分页单行） ----------
 
 const HOT_PAGE_SIZE = 8;
 
 function HotSection(): JSX.Element | null {
   const { t } = useTranslation();
-  const { showError } = useToast();
+  const navigate = useNavigate();
   const [hot, setHot] = useState<HotTrack[] | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     let dead = false;
@@ -183,7 +216,7 @@ function HotSection(): JSX.Element | null {
         if (!dead) setHot(rows);
       })
       .catch(() => {
-        // 无 requester 角色等拒绝：区块静默隐藏
+        // 无 requester 角色等拒绝：区块静默隐藏。
         if (!dead) setHot([]);
       });
     return () => {
@@ -191,41 +224,75 @@ function HotSection(): JSX.Element | null {
     };
   }, []);
 
-  const loadMore = () => {
-    if (!hot || loadingMore) return;
-    setLoadingMore(true);
-    api
-      .hotTracks(7, HOT_PAGE_SIZE, hot.length)
-      .then((more) => setHot((current) => [...(current ?? []), ...more]))
-      .catch(showError)
-      .finally(() => setLoadingMore(false));
-  };
-
   if (!hot || hot.length === 0) return null;
 
+  // 首页只摆第一分页；「显示全部」= 跳转全览页，分页加载在全览页进行
+  const hasMore = hot.length >= HOT_PAGE_SIZE;
   return (
-    <section>
-      <SectionTitle>{t('home.hotTitle')}</SectionTitle>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <section className="mt-10">
+      <ShelfHeader
+        title={t('home.hotTitle')}
+        actionLabel={hasMore ? t('home.showAll') : undefined}
+        onAction={hasMore ? () => navigate('/shelf/hot') : undefined}
+      />
+      <ShelfRow>
         {hot.map((entry) => (
           <ActivityCard
+            className="w-[180px] flex-none"
             key={entry.track_ref}
             trackRef={entry.track_ref}
             title={entry.title}
             meta={t('home.playCount', { count: entry.play_count })}
           />
         ))}
-      </div>
-      {hot.length % HOT_PAGE_SIZE === 0 && (
-        <button
-          type="button"
-          onClick={loadMore}
-          disabled={loadingMore}
-          className="mt-3 w-full rounded-md border border-hairline py-2.5 text-xs text-accent hover:bg-panel disabled:opacity-40"
-        >
-          {loadingMore ? t('common.loading') : t('home.loadMore')}
-        </button>
-      )}
+      </ShelfRow>
+    </section>
+  );
+}
+
+// ---------- 最近播放（个人跨房间历史） ----------
+
+function RecentSection(): JSX.Element | null {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+
+  useEffect(() => {
+    let dead = false;
+    api
+      .myHistory(0, 10)
+      .then((rows) => {
+        if (!dead) setHistory(rows);
+      })
+      .catch(() => {
+        // 无 requester 角色等拒绝：与全局热门相同，区块静默隐藏。
+        if (!dead) setHistory([]);
+      });
+    return () => {
+      dead = true;
+    };
+  }, []);
+
+  if (!history || history.length === 0) return null;
+
+  return (
+    <section className="mt-10">
+      <ShelfHeader
+        title={t('home.recentTitle')}
+        actionLabel={t('home.showAll')}
+        onAction={() => navigate('/shelf/recent')}
+      />
+      <ShelfRow>
+        {history.map((entry) => (
+          <ActivityCard
+            className="w-[180px] flex-none"
+            key={`${entry.track_ref}:${entry.ended_at}`}
+            trackRef={entry.track_ref}
+            title={entry.title}
+            meta={t('home.playedAt', { time: formatClock(entry.ended_at) })}
+          />
+        ))}
+      </ShelfRow>
     </section>
   );
 }
@@ -234,6 +301,7 @@ function HotSection(): JSX.Element | null {
 
 function RoomActivitySections(): JSX.Element | null {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const state = useRoomState();
   const [stats, setStats] = useState<StatsEntry[] | null>(null);
   const roomId = state.roomId;
@@ -242,7 +310,10 @@ function RoomActivitySections(): JSX.Element | null {
     setStats(null);
     if (!roomId) return;
     let dead = false;
-    api.roomStats(roomId, 8).then((rows) => !dead && setStats(rows)).catch(() => !dead && setStats([]));
+    api
+      .roomStats(roomId, 8)
+      .then((rows) => !dead && setStats(rows))
+      .catch(() => !dead && setStats([]));
     return () => {
       dead = true;
     };
@@ -251,52 +322,23 @@ function RoomActivitySections(): JSX.Element | null {
   if (!roomId || !stats || stats.length === 0) return null;
 
   return (
-    <section>
-      <SectionTitle>{t('home.statsTitle')}</SectionTitle>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <section className="mt-10">
+      <ShelfHeader
+        title={t('home.statsTitle')}
+        actionLabel={t('home.showAll')}
+        onAction={() => navigate('/shelf/room')}
+      />
+      <ShelfRow>
         {stats.map((entry) => (
           <ActivityCard
+            className="w-[180px] flex-none"
             key={entry.track_ref}
             trackRef={entry.track_ref}
             title={entry.title}
             meta={t('home.playCount', { count: entry.play_count })}
           />
         ))}
-      </div>
+      </ShelfRow>
     </section>
   );
 }
-
-/** 热门条目卡片：封面 + 标题 + 副信息；整卡点击入队。 */
-function ActivityCard({ trackRef, title, meta }: { trackRef: string; title: string; meta: string }) {
-  const { t } = useTranslation();
-  const { setRoomsOpen } = useShell();
-  const { show, showError } = useToast();
-  const state = useRoomState();
-  return (
-    <button
-      type="button"
-      title={t('search.add')}
-      onClick={() => {
-        if (!state.roomId) {
-          show(t('home.needRoom'));
-          setRoomsOpen(true);
-          return;
-        }
-        void roomStore
-          .addQueue([trackRef])
-          .then(() => show(t('room.addedToast', { title })))
-          .catch(showError);
-      }}
-      className="group rounded-lg border border-hairline bg-panel p-3 text-left transition-colors hover:border-accent hover:bg-panel-2"
-    >
-      <CoverThumb
-        src={coverSrc(`/api/v1/cover/${encodeURIComponent(trackRef)}`)}
-        className="aspect-square w-full rounded"
-      />
-      <div className="mt-2 line-clamp-2 text-[13px] leading-snug font-medium">{title}</div>
-      <div className="mt-0.5 line-clamp-2 text-[11px] text-faint">{meta}</div>
-    </button>
-  );
-}
-

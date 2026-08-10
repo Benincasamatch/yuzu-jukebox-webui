@@ -10,3 +10,12 @@ import { httpBase } from '../config';
 export function coverSrc(url: string): string {
   return url.startsWith('/') ? `${httpBase}${url}` : url;
 }
+
+/**
+ * 原图质量封面：服务端封面端点默认回源缩略图（CoverThumbnailer），
+ * ?size=original 跳过变换（proxyCover 的逃生门）。全屏展示等大幅面场景用。
+ */
+export function originalCoverSrc(url: string): string {
+  const src = coverSrc(url);
+  return `${src}${src.includes('?') ? '&' : '?'}size=original`;
+}

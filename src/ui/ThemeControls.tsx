@@ -4,6 +4,7 @@ import { Moon, Palette, Sun } from 'lucide-react';
 import { applyAccent, applyScheme, currentAccent, currentScheme } from '../app/theme';
 
 const PRESETS: Array<[string, string]> = [
+  ['青绿', '#1DB954'],
   ['柚子黄', '#E3B93C'],
   ['蜜柑', '#E0863C'],
   ['青柚', '#9BBE4A'],

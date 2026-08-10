@@ -62,7 +62,7 @@ export const pageTitle: string = runtime.title || 'Yuzu Jukebox';
 export const faviconUrl: string = runtime.favicon || 'favicon.svg';
 
 /** 默认主题色（用户本机选择优先于它）。 */
-export const defaultAccent: string = runtime.accent || '#E3B93C';
+export const defaultAccent: string = runtime.accent || '#1DB954';
 
 /** 配置指定的默认深浅色；'' = 跟随系统（用户本机锁定优先）。 */
 export const configuredScheme: 'dark' | 'light' | '' = runtime.scheme ?? '';

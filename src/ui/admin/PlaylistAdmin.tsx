@@ -5,7 +5,8 @@ import type { PlaylistDetail, PlaylistInfo } from '../../api/types';
 import { api } from '../../app/session';
 import { coverSrc } from '../cover';
 import { formatDateTime, formatMs } from '../format';
-import { ConfirmDialog, Dialog, Select } from '../primitives';
+import { ConfirmDialog, Dialog } from '../primitives';
+import { ImportPlaylistDialog } from '../ImportPlaylistDialog';
 import { useToast } from '../toast';
 
 const PLAYLIST_PAGE_SIZE = 200;
@@ -34,13 +35,6 @@ export default function PlaylistAdmin() {
   const [trackRefsText, setTrackRefsText] = useState('');
   const [addBusy, setAddBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [importMode, setImportMode] = useState('external');
-  const [importProvider, setImportProvider] = useState('ncm');
-  const [importPlaylistId, setImportPlaylistId] = useState('');
-  const [importSource, setImportSource] = useState('');
-  const [importName, setImportName] = useState('');
-  const [importBind, setImportBind] = useState(false);
-  const [importBusy, setImportBusy] = useState(false);
   const [bindActionBusy, setBindActionBusy] = useState(false);
   const [itemActionOrd, setItemActionOrd] = useState<number | null>(null);
   const [coverBusy, setCoverBusy] = useState(false);
@@ -146,49 +140,6 @@ export default function PlaylistAdmin() {
     }
   };
 
-  const importPlaylist = async () => {
-    const externalReady = importProvider.trim() && importPlaylistId.trim();
-    const sourceReady = importSource.trim();
-    if ((importMode === 'external' ? !externalReady : !sourceReady) || importBusy) return;
-    setImportBusy(true);
-    try {
-      const imported =
-        importMode === 'external' && importBind
-          ? await api.bindPlaylist({
-              provider: importProvider.trim(),
-              playlist_id: importPlaylistId.trim(),
-              name: importName.trim() || undefined,
-            })
-          : await api.importPlaylist(
-              importMode === 'external'
-                ? {
-                    provider: importProvider.trim(),
-                    playlist_id: importPlaylistId.trim(),
-                    name: importName.trim() || undefined,
-                  }
-                : {
-                    source: importSource.trim(),
-                    name: importName.trim() || undefined,
-                  },
-            );
-      setImportOpen(false);
-      setImportPlaylistId('');
-      setImportSource('');
-      setImportName('');
-      setImportBind(false);
-      show(
-        importMode === 'external' && importBind
-          ? t('admin.playlist.bound', { name: imported.name })
-          : t('admin.playlist.imported', { name: imported.name }),
-      );
-      await loadPlaylists();
-      await openPlaylist(imported.id);
-    } catch (error: unknown) {
-      showError(error);
-    } finally {
-      setImportBusy(false);
-    }
-  };
 
   /** 绑定歌单：手动同步 / 解除绑定（只读语义见 spec「Provider 绑定歌单」）。 */
   const syncBound = async () => {
@@ -653,85 +604,14 @@ export default function PlaylistAdmin() {
         </form>
       </Dialog>
 
-      <Dialog open={importOpen} onOpenChange={setImportOpen} title={t('admin.playlist.importDialogTitle')}>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void importPlaylist();
-          }}
-        >
-          <label className="block text-xs text-muted">{t('admin.playlist.importModeLabel')}</label>
-          <Select
-            value={importMode}
-            onValueChange={setImportMode}
-            options={[
-              { value: 'external', label: t('admin.playlist.importExternal') },
-              { value: 'source', label: t('admin.playlist.importSource') },
-            ]}
-            className="mt-1.5 w-full"
-          />
-          {importMode === 'external' ? (
-            <div className="mt-4 grid gap-4">
-              <label className="text-xs text-muted">
-                {t('admin.playlist.providerLabel')}
-                <input
-                  value={importProvider}
-                  onChange={(event) => setImportProvider(event.target.value)}
-                  className={`${inputClass} mt-1.5`}
-                  required
-                />
-              </label>
-              <label className="text-xs text-muted">
-                {t('admin.playlist.playlistIdLabel')}
-                <input
-                  value={importPlaylistId}
-                  onChange={(event) => setImportPlaylistId(event.target.value)}
-                  placeholder={t('admin.playlist.playlistIdPlaceholder')}
-                  className={`${inputClass} mt-1.5`}
-                  required
-                />
-              </label>
-              <label className="flex items-center gap-2 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  checked={importBind}
-                  onChange={(event) => setImportBind(event.target.checked)}
-                  className="yuzu-checkbox"
-                />
-                {t('admin.playlist.bindFollow')}
-              </label>
-            </div>
-          ) : (
-            <label className="mt-4 block text-xs text-muted">
-              {t('admin.playlist.sourceLabel')}
-              <input
-                value={importSource}
-                onChange={(event) => setImportSource(event.target.value)}
-                placeholder={t('admin.playlist.sourcePlaceholder')}
-                className={`${inputClass} mt-1.5`}
-                required
-              />
-            </label>
-          )}
-          <label className="mt-4 block text-xs text-muted">
-            {t('admin.playlist.importNameLabel')}
-            <input
-              value={importName}
-              onChange={(event) => setImportName(event.target.value)}
-              placeholder={t('admin.playlist.importNamePlaceholder')}
-              className={`${inputClass} mt-1.5`}
-            />
-          </label>
-          <div className="mt-5 flex justify-end gap-2">
-            <button type="button" onClick={() => setImportOpen(false)} className={secondaryButtonClass}>
-              {t('common.cancel')}
-            </button>
-            <button type="submit" disabled={importBusy} className={primaryButtonClass}>
-              {importBusy ? t('admin.common.working') : t('admin.playlist.import')}
-            </button>
-          </div>
-        </form>
-      </Dialog>
+<ImportPlaylistDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={(playlist) => {
+          void loadPlaylists();
+          void openPlaylist(playlist.id);
+        }}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

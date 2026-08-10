@@ -10,6 +10,7 @@ import AppShell from './ui/AppShell';
 import MobileShell from './ui/MobileShell';
 import HomeView from './ui/HomeView';
 import SearchView from './ui/SearchView';
+import ShelfView from './ui/ShelfView';
 import PlaylistDetailView from './ui/PlaylistDetailView';
 import SourceCollectionView from './ui/SourceCollectionView';
 import LibraryView from './ui/LibraryView';
@@ -112,6 +113,7 @@ export default function App() {
             <Route element={<ResponsiveShell />}>
               <Route path="/" element={<HomeView />} />
               <Route path="/search" element={<SearchView />} />
+              <Route path="/shelf/:kind" element={<ShelfView />} />
               <Route path="/playlist/:playlistId" element={<PlaylistDetailView />} />
               <Route path="/source/:spec" element={<SourceCollectionView />} />
               <Route path="/library" element={<LibraryView />} />

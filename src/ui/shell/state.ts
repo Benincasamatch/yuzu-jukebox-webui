@@ -21,7 +21,7 @@ import { YuzuError } from '../../protocol/types';
 import { pushOverlayCloser, removeOverlayCloser } from '../backbutton';
 import { useIdentity, useRoomState } from '../hooks';
 import { useToast } from '../toast';
-import type { JoinResult, ShellValue } from '../shellContext';
+import type { JoinResult, RightPanelKind, ShellValue } from '../shellContext';
 
 /** ColorOS 锁屏歌词单例：原生端由插件+api 组装，浏览器为 null（no-op）。 */
 const nativeLyrics: NativeLyricsSync | null = yuzuMediaPlugin
@@ -139,8 +139,30 @@ export function useShellState(): ShellValue {
   const { canControl, canRadio } = useCapabilities();
   usePlaybackWiring(canControl);
 
-  const [queueOpen, setQueueOpen] = useState(false);
-  const [roomsOpen, setRoomsOpen] = useState(false);
+  // 右面板槽位：Now Playing 常驻默认态，queue/rooms 原位叠加、关闭回到
+  // Now Playing（Spotify 同槽复用）。折叠只对 Now Playing 有意义：折叠为
+  // 右侧细轨，悬停预览、点击展开。queueOpen/roomsOpen/nowPlayingOpen 为派生态。
+  const [rightPanel, setRightPanel] = useState<RightPanelKind>('nowPlaying');
+  const [nowPlayingCollapsed, setNowPlayingCollapsed] = useState(false);
+  const queueOpen = rightPanel === 'queue';
+  const roomsOpen = rightPanel === 'rooms';
+  const nowPlayingOpen = rightPanel === 'nowPlaying' && !nowPlayingCollapsed;
+  const setQueueOpen = useCallback(
+    (open: boolean) => setRightPanel(open ? 'queue' : 'nowPlaying'),
+    [],
+  );
+  const setRoomsOpen = useCallback(
+    (open: boolean) => setRightPanel(open ? 'rooms' : 'nowPlaying'),
+    [],
+  );
+  const setNowPlayingOpen = useCallback((open: boolean) => {
+    if (open) {
+      setRightPanel('nowPlaying');
+      setNowPlayingCollapsed(false);
+    } else {
+      setNowPlayingCollapsed(true);
+    }
+  }, []);
 
   // Android 返回键：队列抽屉开时压入关闭栈（原生壳外为空转）
   useEffect(() => {
@@ -212,9 +234,14 @@ export function useShellState(): ShellValue {
     nameOf,
     joinRoom,
     leaveRoom,
+    rightPanel,
+    setRightPanel,
+    nowPlayingCollapsed,
     queueOpen,
     setQueueOpen,
     roomsOpen,
     setRoomsOpen,
+    nowPlayingOpen,
+    setNowPlayingOpen,
   };
 }

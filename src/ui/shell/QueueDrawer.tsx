@@ -1,6 +1,7 @@
 /**
- * 队列抽屉：右侧面板，容纳待播队列（拖拽/移除）、点歌面板、听众与电台。
- * 自 RoomView 的右栏迁移而来；portal 到 body，避免祖先 transform 劫持 fixed 定位。
+ * 队列面板：内容（QueuePanelContent）桌面右槽位与移动端抽屉共用；
+ * QueueDrawer 是移动端容器——portal 到 body，避免祖先 transform 劫持 fixed 定位。
+ * 桌面壳不渲染本抽屉（右槽位 = Spotify 的 Queue/Connect 共用面板位）。
  */
 import {
   useCallback,
@@ -19,75 +20,45 @@ import { roomStore } from '../../app/session';
 import { useIdentity, useRoomState } from '../hooks';
 import { formatClock, formatMs } from '../format';
 import { useToast } from '../toast';
-import { useShell } from '../AppShell';
+import { useShell } from '../shellContext';
 import { RadioPanel } from './RadioPanel';
 
-export function QueueDrawer(): JSX.Element | null {
+/** 队列面板内容：待播队列（拖拽/移除）、电台与听众。onClose 由容器决定去向。 */
+export function QueuePanelContent({ onClose }: { onClose: () => void }): JSX.Element {
   const { t } = useTranslation();
   const state = useRoomState();
   const identity = useIdentity();
-  const { canControl, nameOf, queueOpen, setQueueOpen, setRoomsOpen } = useShell();
+  const { canControl, nameOf, setRoomsOpen } = useShell();
   const { showError } = useToast();
-  const panelRef = useRef<HTMLDivElement | null>(null);
 
-  // ESC 或点击面板外部自动收起
-  useEffect(() => {
-    if (!queueOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setQueueOpen(false);
-    };
-    const onPointer = (e: PointerEvent) => {
-      const target = e.target as Node;
-      // 触发按钮的 pointerdown 先于 click 到达：若按空白逻辑先收起，
-      // 随后按钮 click 的 !queueOpen 会立刻重新展开。触发按钮本身例外。
-      if (target instanceof Element && target.closest('[data-queue-toggle]')) return;
-      if (!panelRef.current?.contains(target)) setQueueOpen(false);
-    };
-    document.addEventListener('keydown', onKey);
-    // 捕获阶段：确保任何点击（含抽屉内部按钮触发的新 popover）先判定归属
-    document.addEventListener('pointerdown', onPointer, true);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.removeEventListener('pointerdown', onPointer, true);
-    };
-  }, [queueOpen, setQueueOpen]);
-
-  return createPortal(
-    // 纵向夹在顶栏与底部 chrome 之间：壳高变量定义在 tokens.css :root
-    //（本抽屉 portal 到 body，继承不到壳容器变量）。移动端满宽，不带左右 border。
-    <div
-      ref={panelRef}
-      className={`fixed inset-x-0 top-(--header-h) bottom-(--chrome-b) z-30 flex flex-col border-t border-hairline bg-panel transition-transform duration-200 md:left-auto md:right-0 md:w-[380px] md:max-w-[92vw] md:border-r md:border-l ${
-        queueOpen ? 'translate-x-0' : 'translate-x-full'
-      }`}
-      aria-hidden={!queueOpen}
-    >
-      <header className="flex flex-none items-baseline justify-between border-b border-hairline px-4.5 py-3.5">
-        <span className="font-mono text-[11px] tracking-[0.14em] text-faint">{t('room.queueTitle')}</span>
-        <div className="flex items-center gap-3">
-          {state.roomId && (
-            <span className="font-mono text-xs text-muted tabular-nums">
-              {t('room.queueCount', { count: state.queue.length })}
-            </span>
-          )}
-          {canControl && state.queue.length > 0 && (
-            <button
-              type="button"
-              onClick={() => void roomStore.clearQueue().catch(showError)}
-              className="text-xs text-muted hover:text-paper"
-            >
-              {t('room.clearQueue')}
-            </button>
-          )}
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex flex-none items-center gap-3 px-4 py-4">
+        <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-paper">
+          {t('room.queueTitle')}
+        </p>
+        {state.roomId && (
+          <span className="flex-none text-xs text-muted tabular-nums">
+            {t('room.queueCount', { count: state.queue.length })}
+          </span>
+        )}
+        {canControl && state.queue.length > 0 && (
           <button
             type="button"
-            aria-label={t('shell.queueClose')}
-            onClick={() => setQueueOpen(false)}
-            className="relative grid h-6 w-6 place-items-center rounded-full text-faint after:absolute after:-inset-2 after:content-[''] hover:bg-[var(--hover)] hover:text-paper"
+            onClick={() => void roomStore.clearQueue().catch(showError)}
+            className="flex-none text-xs text-muted hover:text-paper"
           >
-            <X className="h-3.5 w-3.5" />
+            {t('room.clearQueue')}
           </button>
-        </div>
+        )}
+        <button
+          type="button"
+          aria-label={t('shell.queueClose')}
+          onClick={onClose}
+          className="grid h-8 w-8 flex-none place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper"
+        >
+          <X className="h-5 w-5" />
+        </button>
       </header>
 
       {!state.roomId ? (
@@ -96,7 +67,7 @@ export function QueueDrawer(): JSX.Element | null {
           <button
             type="button"
             onClick={() => {
-              setQueueOpen(false);
+              onClose();
               setRoomsOpen(true);
             }}
             className="rounded-full bg-accent px-5 py-2 text-[13px] font-medium text-on-accent hover:brightness-105"
@@ -128,6 +99,48 @@ export function QueueDrawer(): JSX.Element | null {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** 移动端队列抽屉：portal + ESC/点外收起。桌面壳不挂载本组件。 */
+export function QueueDrawer(): JSX.Element | null {
+  const { queueOpen, setQueueOpen } = useShell();
+  const panelRef = useRef<HTMLDivElement | null>(null);
+
+  // ESC 或点击面板外部自动收起
+  useEffect(() => {
+    if (!queueOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setQueueOpen(false);
+    };
+    const onPointer = (e: PointerEvent) => {
+      const target = e.target as Node;
+      // 触发按钮的 pointerdown 先于 click 到达：若按空白逻辑先收起，
+      // 随后按钮 click 的 !queueOpen 会立刻重新展开。触发按钮本身例外。
+      if (target instanceof Element && target.closest('[data-queue-toggle]')) return;
+      if (!panelRef.current?.contains(target)) setQueueOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    // 捕获阶段：确保任何点击（含抽屉内部按钮触发的新 popover）先判定归属
+    document.addEventListener('pointerdown', onPointer, true);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer, true);
+    };
+  }, [queueOpen, setQueueOpen]);
+
+  return createPortal(
+    // 纵向夹在顶栏与底部 chrome 之间：壳高变量定义在 tokens.css :root
+    //（本抽屉 portal 到 body，继承不到壳容器变量）。移动端满宽。
+    <div
+      ref={panelRef}
+      className={`fixed inset-x-0 top-(--header-h) bottom-(--chrome-b) z-30 flex flex-col border-t border-hairline bg-panel transition-transform duration-200 ${
+        queueOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}
+      aria-hidden={!queueOpen}
+    >
+      <QueuePanelContent onClose={() => setQueueOpen(false)} />
     </div>,
     document.body,
   );

@@ -95,7 +95,7 @@ export default function SourceCollectionView(): JSX.Element {
   const hasMore = tracks !== null && (total !== null ? tracks.length < total : lastPageFull);
 
   return (
-    <div className="view-enter mx-auto max-w-3xl px-4 pt-4 pb-10 md:px-7 md:pt-7">
+    <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
       <div className="mb-6 flex items-end justify-between gap-4">
         <div className="flex min-w-0 items-end gap-4">
           <span className="grid h-24 w-24 flex-none place-items-center rounded-lg bg-panel-2 text-faint">

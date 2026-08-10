@@ -18,20 +18,32 @@ src/
                player.ts(全局唯一 <audio>+renderer)、theme.ts(主题)、
                mediasession.ts(系统媒体控制)
   ui/          React 视图：Login + 播放器外壳（AppShell=登录后常驻骨架，
-               shell/PlayerBar 底部栏、shell/RoomSwitcher 房间切换弹窗、
-               shell/QueueDrawer 队列抽屉、shell/RadioPanel 电台面板；
+               全局 TopBar + shell/LibraryRail 左曲库栏 + 主面板 +
+               右侧通用面板槽位（NowPlayingPanel/QueuePanelContent/RoomsPanel
+               三态叠加）+ shell/PlayerBar 底部栏、shell/RoomSwitcher 房间切换钮、
+               shell/QueueDrawer 移动端队列抽屉、shell/RadioPanel 电台面板；
                页面=Home 漫游/Search/PlaylistDetail/RoomDeepLink）+ admin/
   i18n/        i18next 初始化 + zh-CN 文案目录
-  design/      视觉稿 mockup.html（设计决策的唯一参照）
+  design/      视觉稿 mockup.html（yuzutify 前的旧设计参照；当前设计参照 =
+               Spotify Web 播放器视觉语言，见「交互架构」节）
 ```
 
 交互架构（Phase E 起）：**登录后着陆 = 播放器外壳**，房间是状态而非页面——
-底部栏右侧的房间切换弹窗（Spotify 设备菜单的对应物）承担换房；自动入房
-（localStorage `yuzu-last-room` → 唯一房间 → 未入房空态）；`/r/:id` 深链
-（兼容旧 `/room/:id`）只承担「切房」动作。房间治理（建删/策略/授权/输出/历史）
-集中在 /admin「房间」tab；电台开停留在播放器侧（队列抽屉 RadioPanel）。
+自动入房（localStorage `yuzu-last-room` → 唯一房间 → 未入房空态）；
+`/r/:id` 深链（兼容旧 `/room/:id`）只承担「切房」动作。房间治理
+（建删/策略/授权/输出/历史）集中在 /admin「房间」tab。
 播放接线（renderer.render/Media Session/自动播放解锁/canControl 查询）常驻
 AppShell，页面切换不影响出声。
+
+桌面外壳（yuzutify 起）= Spotify Web 视觉复刻：全局 TopBar（主页钮+胶囊搜索+
+管理/主题/账户）、左曲库栏、主面板、**右侧通用面板槽位**、底部播放栏；
+面板间 8px 黑缝分隔（壳 `p-2 gap-2`，无 border）。槽位状态机
+（`shell/state.ts`，单源 `rightPanel`）：**Now Playing 是常驻默认态**，
+queue/rooms 打开时原位叠加、关闭回到 Now Playing；Now Playing 无播放控件
+入口，其「关闭」= 折叠为右侧细轨（悬停左缘外探、半透明预览、点击展开）。
+queueOpen/roomsOpen/nowPlayingOpen 均为派生态，移动端抽屉/弹层共用同一
+状态源。电台开停留在队列面板的 RadioPanel；房间切换（含 controller 控制区）
+在槽位的 rooms 内容（RoomPickerContent，移动端房间弹层复用）。
 
 核心纪律：
 
@@ -67,6 +79,10 @@ AppShell，页面切换不影响出声。
   缺省查 listeners 表，最后回退身份 ID。
 
 ## 主题系统（三条正交轴）
+
+yuzutify 起默认配色 = Spotify 风：深色板纯黑基底 + `#121212` 面板、accent 默认
+`#1DB954`（config.js 可覆盖，用户本机选择优先）；YIQ 阈值 120 使绿落到深色
+`--on-accent`。无衬线（--font-display 与 body 同 sans 族，标题靠字重分层）。
 
 1. `scheme`：深/浅基底色板，`<html data-scheme>` 切换，localStorage `yuzu-scheme`
    锁定，默认跟随系统；index.html 有首帧前内联脚本防刷白。

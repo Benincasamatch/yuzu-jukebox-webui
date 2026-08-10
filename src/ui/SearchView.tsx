@@ -8,13 +8,25 @@ import { useEffect, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DropdownMenu } from 'radix-ui';
-import { ArrowLeft, Check, ChevronDown, ChevronRight, Disc3, ListMusic, ListPlus, Radio, Search as SearchIcon, User } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  CirclePlus,
+  Disc3,
+  ListMusic,
+  ListPlus,
+  Radio,
+  Search as SearchIcon,
+  User,
+} from 'lucide-react';
 import type { SearchCategory, SearchEntity, SearchTrack } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { useIdentity, useProviders, useRoomState } from './hooks';
 import { coverSrc } from './cover';
+import { formatMs } from './format';
 import { composeSource, entityRadioSource } from './radioSources';
-import { TrackList, useEnqueue } from './TrackList';
+import { TrackList, useEnqueue, useTrackSelect, type TrackSelect } from './TrackList';
 import { useToast } from './toast';
 import { SEARCH_PROVIDER_KEY, useShell } from './AppShell';
 
@@ -63,7 +75,7 @@ export default function SearchView(): JSX.Element {
   }, [query, provider]);
 
   return (
-    <div className="view-enter mx-auto max-w-5xl px-4 pt-4 pb-10 md:px-7 md:pt-7">
+    <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
       {/* 移动端输入框：顶栏搜索 icon 跳转到这里，页面自带输入（桌面端用顶栏输入框）。
           provider 切换折叠在框内左侧（与桌面顶栏同一交互） */}
       <form
@@ -134,10 +146,10 @@ export default function SearchView(): JSX.Element {
               setCategory(chip);
               setDrill(null);
             }}
-            className={`rounded-full px-3.5 py-1.5 text-[12.5px] transition-colors ${
+            className={`rounded-full px-3.5 py-1.5 text-[13.5px] transition-colors ${
               category === chip && drill === null
-                ? 'bg-accent text-on-accent'
-                : 'border border-hairline text-muted hover:border-faint hover:text-paper'
+                ? 'bg-paper text-hall'
+                : 'bg-panel-2 text-paper hover:bg-[var(--hover)]'
             }`}
           >
             {t(CHIP_KEYS[chip])}
@@ -153,14 +165,10 @@ export default function SearchView(): JSX.Element {
 
       {query &&
         drill === null &&
-        (category === 'all' || category === 'song' ? (
-          <>
-            {/* 「全部」的选择性采纳：最匹配歌手 + 单曲列表；其余分类留给独立 tab */}
-            {category === 'all' && supported.includes('artist') && (
-              <TopArtistResult provider={provider} query={query} onDrill={setDrill} />
-            )}
-            <SongResults provider={provider} query={query} />
-          </>
+        (category === 'all' ? (
+          <AllResults provider={provider} query={query} supported={supported} onDrill={setDrill} />
+        ) : category === 'song' ? (
+          <SongResults provider={provider} query={query} />
         ) : (
           <EntitySection provider={provider} query={query} category={category} onDrill={setDrill} />
         ))}
@@ -171,6 +179,200 @@ export default function SearchView(): JSX.Element {
 // ---------- 单曲结果（真实检索，分页） ----------
 
 const PAGE_SIZE = 30;
+
+type EntityCategory = Exclude<SearchCategory, 'song'>;
+
+interface EntityHit {
+  category: EntityCategory;
+  entity: SearchEntity;
+}
+
+const ALL_ENTITY_LIMIT = 6;
+
+function AllResults({
+  provider,
+  query,
+  supported,
+  onDrill,
+}: {
+  provider: string;
+  query: string;
+  supported: SearchCategory[];
+  onDrill: (target: DrillTarget) => void;
+}) {
+  const { t } = useTranslation();
+  const { showError } = useToast();
+  const enqueue = useEnqueue();
+  const select = useTrackSelect();
+  const actions = useEntityActions(provider, onDrill);
+  const [tracks, setTracks] = useState<SearchTrack[] | null>(null);
+  const [entities, setEntities] = useState<EntityHit[] | null>(null);
+  const entityCategories = supported.filter(
+    (category): category is EntityCategory => category !== 'song',
+  );
+  const entityCategoryKey = entityCategories.join(',');
+  const supportsSongs = supported.includes('song');
+
+  useEffect(() => {
+    setTracks(null);
+    setEntities(null);
+    select.clear();
+    let dead = false;
+
+    if (supportsSongs) {
+      api
+        .search(provider, query, { limit: 4 })
+        .then((list) => {
+          if (!dead) setTracks(list);
+        })
+        .catch((error: unknown) => {
+          if (!dead) {
+            setTracks([]);
+            showError(error);
+          }
+        });
+    } else {
+      setTracks([]);
+    }
+
+    void Promise.all(
+      entityCategories.map(async (category) => {
+        try {
+          const list = await api.searchCategory(provider, query, category, {
+            limit: ALL_ENTITY_LIMIT,
+          });
+          return list.map((entity): EntityHit => ({ category, entity }));
+        } catch {
+          return [];
+        }
+      }),
+    ).then((groups) => {
+      if (!dead) setEntities(groups.flat());
+    });
+
+    return () => {
+      dead = true;
+    };
+    // entityCategoryKey is the stable capability signature; the array itself is recreated per render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provider, query, entityCategoryKey, supportsSongs, showError]);
+
+  if (tracks === null || entities === null) {
+    return <p className="py-6 text-sm text-muted">{t('common.loading')}</p>;
+  }
+
+  const topEntityIndex = entities.findIndex(({ entity }) => Boolean(entity.entity_id));
+  const topEntity = topEntityIndex >= 0 ? entities[topEntityIndex] : undefined;
+  const topTrack = topEntity ? undefined : tracks[0];
+  const remainingEntities = entities.filter((_, index) => index !== topEntityIndex);
+
+  if (!topEntity && !topTrack) {
+    return <p className="py-12 text-sm text-faint">{t('search.empty')}</p>;
+  }
+
+  return (
+    <div className="space-y-9">
+      {select.menuNode}
+      {select.fabNode}
+
+      <section>
+        <h2 className="mb-3 text-2xl font-bold text-paper">{t('searchPage.topResult')}</h2>
+        <TopResultCard hit={topEntity} track={topTrack} actions={actions} />
+      </section>
+
+      {supportsSongs && tracks.length > 0 && (
+        <CompactSongs
+          tracks={tracks}
+          select={select}
+          onQuickAdd={(track) => enqueue([track.track_ref], track.title)}
+        />
+      )}
+
+      {remainingEntities.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-2xl font-bold text-paper">{t('searchPage.moreEntities')}</h2>
+          <div className="flex gap-4 overflow-x-auto pb-2">
+            {remainingEntities.map((hit) => (
+              <EntityCard
+                key={`${hit.category}:${hit.entity.entity_id ?? hit.entity.name}`}
+                hit={hit}
+                actions={actions}
+                className="w-40 flex-none md:w-44"
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function CompactSongs({
+  tracks,
+  select,
+  onQuickAdd,
+}: {
+  tracks: SearchTrack[];
+  select: TrackSelect;
+  onQuickAdd: (track: SearchTrack) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <section>
+      <h2 className="mb-3 text-2xl font-bold text-paper">{t('searchPage.catSongs')}</h2>
+      <div>
+        {tracks.slice(0, 4).map((track) => {
+          const selected = select.selectedRefs.has(track.track_ref);
+          return (
+            <div
+              key={track.track_ref}
+              tabIndex={0}
+              {...select.rowProps(track)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  if (event.ctrlKey || event.metaKey) select.toggle(track.track_ref);
+                  else onQuickAdd(track);
+                }
+              }}
+              className={`grid cursor-pointer grid-cols-[40px_minmax(0,1fr)_auto_auto] items-center gap-3 rounded-md px-2 py-2 transition-colors select-none ${
+                selected ? 'bg-panel-2' : 'hover:bg-[var(--hover)]'
+              }`}
+            >
+              <img
+                src={coverSrc(
+                  track.cover_url || `/api/v1/cover/${encodeURIComponent(track.track_ref)}`,
+                )}
+                alt={track.title}
+                className="h-10 w-10 rounded-md object-cover"
+              />
+              <div className="min-w-0">
+                <div className="truncate text-[14px] text-paper">{track.title}</div>
+                <div className="truncate text-[13px] text-muted">{track.artist}</div>
+              </div>
+              <span className="text-[12px] text-muted tabular-nums">{formatMs(track.duration_ms)}</span>
+              <button
+                type="button"
+                title={t('searchPage.quickAdd', { title: track.title })}
+                aria-label={t('searchPage.quickAdd', { title: track.title })}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onQuickAdd(track);
+                }}
+                className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-panel-2 hover:text-paper"
+              >
+                <CirclePlus className="h-[18px] w-[18px]" aria-hidden="true" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 
 function SongResults({ provider, query }: { provider: string; query: string }) {
   const { t } = useTranslation();
@@ -214,7 +416,7 @@ function SongResults({ provider, query }: { provider: string; query: string }) {
 
   return (
     <section>
-      <h2 className="mt-8 mb-3 font-mono text-[11px] tracking-[0.14em] uppercase text-faint first:mt-0">
+      <h2 className="mt-8 mb-4 text-2xl font-bold text-paper first:mt-0">
         {t('searchPage.catSongs')}
       </h2>
       {busy && <p className="py-6 text-sm text-muted">{t('common.loading')}</p>}
@@ -242,23 +444,14 @@ function EntitySection({
 }: {
   provider: string;
   query: string;
-  category: SearchCategory;
+  category: EntityCategory;
   onDrill: (target: DrillTarget) => void;
 }) {
   const { t } = useTranslation();
-  const { show, showError } = useToast();
-  const navigate = useNavigate();
-  const identity = useIdentity();
-  const state = useRoomState();
-  const providers = useProviders();
-  const { canRadio, setRoomsOpen } = useShell();
+  const { showError } = useToast();
+  const actions = useEntityActions(provider, onDrill);
   const [results, setResults] = useState<SearchEntity[] | null>(null);
-  const [importBusy, setImportBusy] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-
-  const canImport = identity?.roles.includes('media_admin') ?? false;
-  // 歌单实体可作电台播放（ncm playlist:<id> / bili fav:<media_id>，无需导入）
-  const radioSource = category === 'playlist' ? entityRadioSource(providers, provider) : null;
 
   useEffect(() => {
     setResults(null);
@@ -286,12 +479,66 @@ function EntitySection({
       .finally(() => setLoadingMore(false));
   };
 
-  if (results === null || results.length === 0) return null;
+  if (results === null) {
+    return <p className="py-6 text-sm text-muted">{t('common.loading')}</p>;
+  }
 
-  const Icon = ENTITY_ICONS[category as 'artist' | 'album' | 'playlist'] ?? Disc3;
+  if (results.length === 0) {
+    return <p className="py-6 text-sm text-faint">{t('search.empty')}</p>;
+  }
+
+  return (
+    <section>
+      <h2 className="mb-4 text-2xl font-bold text-paper">{t(CHIP_KEYS[category])}</h2>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5">
+        {results.map((entity) => (
+          <EntityCard
+            key={`${category}:${entity.entity_id ?? entity.name}`}
+            hit={{ category, entity }}
+            actions={actions}
+          />
+        ))}
+      </div>
+      {results.length % PAGE_SIZE === 0 && (
+        <button
+          type="button"
+          onClick={loadMore}
+          disabled={loadingMore}
+          className="mt-4 w-full rounded-full bg-panel-2 py-2.5 text-[13px] font-semibold text-paper transition hover:bg-[var(--hover)] disabled:opacity-40"
+        >
+          {loadingMore ? t('common.loading') : t('searchPage.loadMore')}
+        </button>
+      )}
+    </section>
+  );
+}
+
+interface EntityActions {
+  canImport: boolean;
+  canPlayAsRadio: boolean;
+  importBusy: boolean;
+  playlistDisabled: boolean;
+  open: (hit: EntityHit) => void;
+  importEntity: (entity: SearchEntity) => void;
+  playAsRadio: (entity: SearchEntity) => void;
+}
+
+function useEntityActions(
+  provider: string,
+  onDrill: (target: DrillTarget) => void,
+): EntityActions {
+  const { t } = useTranslation();
+  const { show, showError } = useToast();
+  const navigate = useNavigate();
+  const identity = useIdentity();
+  const state = useRoomState();
+  const providers = useProviders();
+  const { canRadio, setRoomsOpen } = useShell();
+  const [importBusy, setImportBusy] = useState(false);
+  const canImport = identity?.roles.includes('media_admin') ?? false;
+  const radioSource = entityRadioSource(providers, provider);
 
   const importEntity = (entity: SearchEntity) => {
-    // 歌单实体 = 导入动作（media_admin 写权限）
     if (!entity.entity_id || !canImport || importBusy) return;
     setImportBusy(true);
     void api
@@ -323,16 +570,16 @@ function EntitySection({
       .catch(showError);
   };
 
-  const open = (entity: SearchEntity) => {
+  const open = (hit: EntityHit) => {
+    const { category, entity } = hit;
     if (!entity.entity_id) return;
     if (category === 'playlist') {
-      // 主操作：能作电台则作电台，否则（media_admin）导入
       if (radioSource) playAsRadio(entity);
       else importEntity(entity);
       return;
     }
     onDrill({
-      type: category as 'artist' | 'album',
+      type: category,
       id: entity.entity_id,
       name: entity.name ?? '',
       coverUrl: entity.cover_url,
@@ -340,163 +587,224 @@ function EntitySection({
     });
   };
 
-  // 与单曲一致的条目列举：封面 + 名称 + 次要信息 + 进入指示
+  return {
+    canImport,
+    canPlayAsRadio: Boolean(radioSource),
+    importBusy,
+    playlistDisabled: !radioSource && !canImport,
+    open,
+    importEntity,
+    playAsRadio,
+  };
+}
+
+function EntityCard({
+  hit,
+  actions,
+  className = '',
+}: {
+  hit: EntityHit;
+  actions: EntityActions;
+  className?: string;
+}) {
+  const { t } = useTranslation();
+  const { category, entity } = hit;
+  const Icon = ENTITY_ICONS[category];
+  const dead = !entity.entity_id || (category === 'playlist' && actions.playlistDisabled);
+
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 font-mono text-[11px] tracking-[0.14em] uppercase text-faint">
-        {t(CHIP_KEYS[category])}
-      </h2>
-      <div className="overflow-hidden rounded-lg border border-hairline bg-panel">
-        {results.map((entity) => {
-          const dead = category === 'playlist' && !radioSource && !canImport;
-          return (
-            <div
-              key={entity.entity_id ?? entity.name}
-              role="button"
-              tabIndex={dead ? -1 : 0}
-              aria-disabled={dead}
-              title={dead ? t('searchPage.importNeedAdmin') : undefined}
-              onClick={() => {
-                if (!dead) open(entity);
-              }}
-              onKeyDown={(event) => {
-                if (!dead && (event.key === 'Enter' || event.key === ' ')) {
-                  event.preventDefault();
-                  open(entity);
-                }
-              }}
-              className={`flex w-full items-center gap-3 border-b border-hairline px-3.5 py-2.5 text-left transition-colors last:border-b-0 hover:bg-panel-2 ${
-                dead ? 'opacity-50' : 'cursor-pointer'
-              }`}
-            >
-              {entity.cover_url ? (
-                <img
-                  src={coverSrc(entity.cover_url)}
-                  alt=""
-                  className={`h-10 w-10 flex-none object-cover ${
-                    category === 'artist' ? 'rounded-full' : 'rounded'
-                  }`}
-                />
-              ) : (
-                <div
-                  className={`grid h-10 w-10 flex-none place-items-center bg-panel-2 text-faint ${
-                    category === 'artist' ? 'rounded-full' : 'rounded'
-                  }`}
-                >
-                  <Icon className="h-4.5 w-4.5" />
-                </div>
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13.5px]">{entity.name}</span>
-                {entity.detail && (
-                  <span className="mt-0.5 block truncate text-[11.5px] text-muted">{entity.detail}</span>
-                )}
-              </span>
-              {category === 'playlist' && radioSource && (
-                <button
-                  type="button"
-                  title={t('searchPage.playAsRadio')}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    playAsRadio(entity);
-                  }}
-                  className="grid h-7 w-7 flex-none place-items-center rounded-full border border-hairline text-muted hover:border-accent hover:text-accent"
-                >
-                  <Radio className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {category === 'playlist' && canImport && (
-                <button
-                  type="button"
-                  title={t('searchPage.importAction')}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    importEntity(entity);
-                  }}
-                  className="grid h-7 w-7 flex-none place-items-center rounded-full border border-hairline text-muted hover:border-accent hover:text-accent"
-                >
-                  <ListPlus className="h-3.5 w-3.5" />
-                </button>
-              )}
-              {category !== 'playlist' && <ChevronRight className="h-4 w-4 flex-none text-faint" />}
-            </div>
-          );
-        })}
-        {results.length % PAGE_SIZE === 0 && (
-          <button
-            type="button"
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="w-full border-t border-hairline py-2.5 text-xs text-accent hover:bg-panel-2 disabled:opacity-40"
+    <article
+      role="button"
+      tabIndex={dead ? -1 : 0}
+      aria-disabled={dead}
+      title={dead && category === 'playlist' ? t('searchPage.importNeedAdmin') : undefined}
+      onClick={() => {
+        if (!dead) actions.open(hit);
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (!dead && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          actions.open(hit);
+        }
+      }}
+      className={`group rounded-lg bg-[var(--hover)] p-3 text-left transition-colors hover:bg-panel-2 ${
+        dead ? 'opacity-50' : 'cursor-pointer'
+      } ${className}`}
+    >
+      <div className="relative aspect-square w-full">
+        {entity.cover_url ? (
+          <img
+            src={coverSrc(entity.cover_url)}
+            alt={entity.name ?? ''}
+            className={`h-full w-full object-cover ${
+              category === 'artist' ? 'rounded-full' : 'rounded-md'
+            }`}
+          />
+        ) : (
+          <div
+            className={`grid h-full w-full place-items-center bg-panel-2 text-faint ${
+              category === 'artist' ? 'rounded-full' : 'rounded-md'
+            }`}
           >
-            {loadingMore ? t('common.loading') : t('searchPage.loadMore')}
-          </button>
+            <Icon className="h-9 w-9" aria-hidden="true" />
+          </div>
         )}
       </div>
-    </section>
+      <div className="mt-3 truncate text-[15px] font-semibold text-paper">{entity.name}</div>
+      {entity.detail && (
+        <div className="mt-1 line-clamp-2 text-[13px] leading-snug text-muted">{entity.detail}</div>
+      )}
+      {category === 'playlist' && (actions.canPlayAsRadio || actions.canImport) && (
+        <div className="mt-2 flex gap-1">
+          {actions.canPlayAsRadio && (
+            <button
+              type="button"
+              title={t('searchPage.playAsRadio')}
+              onClick={(event) => {
+                event.stopPropagation();
+                actions.playAsRadio(entity);
+              }}
+              className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper"
+            >
+              <Radio className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+          {actions.canImport && (
+            <button
+              type="button"
+              title={t('searchPage.importAction')}
+              disabled={actions.importBusy}
+              onClick={(event) => {
+                event.stopPropagation();
+                actions.importEntity(entity);
+              }}
+              className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper disabled:opacity-40"
+            >
+              <ListPlus className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
+    </article>
   );
 }
 
-// ---------- 「全部」的最匹配歌手（Spotify top result 的对应物） ----------
-
-function TopArtistResult({
-  provider,
-  query,
-  onDrill,
+function TopResultCard({
+  hit,
+  track,
+  actions,
 }: {
-  provider: string;
-  query: string;
-  onDrill: (target: DrillTarget) => void;
+  hit?: EntityHit;
+  track?: SearchTrack;
+  actions: EntityActions;
 }) {
   const { t } = useTranslation();
-  const [top, setTop] = useState<SearchEntity | null>(null);
+  const enqueue = useEnqueue();
+  if (!hit && !track) return null;
 
-  useEffect(() => {
-    setTop(null);
-    let dead = false;
-    api
-      .searchCategory(provider, query, 'artist', { limit: 1 })
-      .then((entities) => {
-        if (!dead) setTop(entities.find((e) => e.entity_id) ?? null);
-      })
-      .catch(() => {
-        if (!dead) setTop(null);
-      });
-    return () => {
-      dead = true;
-    };
-  }, [query, provider]);
+  const category: SearchCategory = hit?.category ?? 'song';
+  const entity = hit?.entity;
+  const Icon = category === 'song' ? Disc3 : ENTITY_ICONS[category];
+  const name = entity?.name ?? track?.title ?? '';
+  const detail = entity?.detail ?? track?.artist;
+  const coverUrl = entity?.cover_url ?? track?.cover_url;
+  const dead = hit
+    ? !entity?.entity_id || (category === 'playlist' && actions.playlistDisabled)
+    : false;
 
-  if (!top) return null;
+  const activate = () => {
+    if (hit) actions.open(hit);
+    // 单曲 Top Result：大卡是单一动作面，点击 = 直接入队（不走选择模型）
+    else if (track) enqueue([track.track_ref], track.title);
+  };
 
   return (
-    <section className="mb-8">
-      <button
-        type="button"
-        onClick={() =>
-          onDrill({
-            type: 'artist',
-            id: top.entity_id!,
-            name: top.name ?? '',
-            coverUrl: top.cover_url,
-            detail: top.detail,
-          })
+    <article
+      role="button"
+      aria-disabled={dead || undefined}
+      tabIndex={dead ? -1 : 0}
+      title={
+        dead && category === 'playlist'
+          ? t('searchPage.importNeedAdmin')
+          : track
+            ? t('search.add')
+            : undefined
+      }
+      onClick={() => {
+        if (!dead) activate();
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (!dead && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          activate();
         }
-        className="flex w-full items-center gap-5 rounded-lg border border-hairline bg-panel px-6 py-5 text-left transition-colors hover:border-faint hover:bg-panel-2"
-      >
-        {top.cover_url ? (
-          <img src={coverSrc(top.cover_url)} alt="" className="h-20 w-20 flex-none rounded-full object-cover" />
-        ) : (
-          <div className="grid h-20 w-20 flex-none place-items-center rounded-full bg-panel-2 text-faint">
-            <User className="h-8 w-8" />
-          </div>
-        )}
-        <span className="min-w-0">
-          <span className="block line-clamp-2 font-display text-xl leading-tight font-semibold md:text-2xl">{top.name}</span>
-          <span className="mt-1 block text-xs text-muted">{t('searchPage.catArtists')}</span>
+      }}
+      className={`flex min-h-36 items-center gap-5 rounded-lg bg-[var(--hover)] p-5 text-left transition-colors hover:bg-panel-2 ${
+        dead ? 'opacity-50' : 'cursor-pointer'
+      }`}
+    >
+      {coverUrl ? (
+        <img
+          src={
+            track
+              ? coverSrc(track.cover_url || `/api/v1/cover/${encodeURIComponent(track.track_ref)}`)
+              : coverSrc(coverUrl)
+          }
+          alt={name}
+          className={`h-[92px] w-[92px] flex-none object-cover ${
+            category === 'artist' ? 'rounded-full' : 'rounded-md'
+          }`}
+        />
+      ) : (
+        <div
+          className={`grid h-[92px] w-[92px] flex-none place-items-center bg-panel-2 text-faint ${
+            category === 'artist' ? 'rounded-full' : 'rounded-md'
+          }`}
+        >
+          <Icon className="h-9 w-9" aria-hidden="true" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="line-clamp-2 text-2xl leading-tight font-bold text-paper">{name}</div>
+        {detail && <div className="mt-1 truncate text-[13px] text-muted">{detail}</div>}
+        <span className="mt-3 inline-flex rounded-full bg-hall px-2.5 py-1 text-[12px] text-paper">
+          {t(CHIP_KEYS[category])}
         </span>
-      </button>
-    </section>
+      </div>
+      {category === 'playlist' && entity && (
+        <div className="flex flex-none gap-1 self-end">
+          {actions.canPlayAsRadio && (
+            <button
+              type="button"
+              title={t('searchPage.playAsRadio')}
+              onClick={(event) => {
+                event.stopPropagation();
+                actions.playAsRadio(entity);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-full text-muted transition hover:bg-hall hover:text-paper"
+            >
+              <Radio className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+          {actions.canImport && (
+            <button
+              type="button"
+              title={t('searchPage.importAction')}
+              disabled={actions.importBusy}
+              onClick={(event) => {
+                event.stopPropagation();
+                actions.importEntity(entity);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-full text-muted transition hover:bg-hall hover:text-paper disabled:opacity-40"
+            >
+              <ListPlus className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -548,7 +856,7 @@ function AlbumGrid({
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5">
         {albums.map((album) => (
           <button
             key={album.entity_id ?? album.name}
@@ -563,21 +871,21 @@ function AlbumGrid({
                 detail: album.detail,
               })
             }
-            className="group rounded-lg border border-hairline bg-panel p-3 text-left transition-colors hover:border-accent hover:bg-panel-2 disabled:opacity-40"
+            className="group rounded-lg bg-[var(--hover)] p-3 text-left transition-colors hover:bg-panel-2 disabled:opacity-40"
           >
             {album.cover_url ? (
               <img
                 src={coverSrc(album.cover_url)}
-                alt=""
-                className="aspect-square w-full rounded object-cover"
+                alt={album.name ?? ''}
+                className="aspect-square w-full rounded-md object-cover"
               />
             ) : (
-              <span className="grid aspect-square w-full place-items-center rounded bg-panel-2 text-faint">
-                <Disc3 className="h-8 w-8" />
+              <span className="grid aspect-square w-full place-items-center rounded-md bg-panel-2 text-faint">
+                <Disc3 className="h-8 w-8" aria-hidden="true" />
               </span>
             )}
-            <div className="mt-2 line-clamp-2 text-[13px] leading-snug font-medium">{album.name}</div>
-            {album.detail && <div className="mt-0.5 line-clamp-2 text-[11px] text-faint">{album.detail}</div>}
+            <div className="mt-3 line-clamp-2 text-[15px] leading-snug font-semibold text-paper">{album.name}</div>
+            {album.detail && <div className="mt-1 line-clamp-2 text-[13px] text-muted">{album.detail}</div>}
           </button>
         ))}
       </div>
@@ -586,7 +894,7 @@ function AlbumGrid({
           type="button"
           onClick={loadMore}
           disabled={loadingMore}
-          className="mt-3 w-full rounded-md border border-hairline py-2.5 text-xs text-accent hover:bg-panel disabled:opacity-40"
+          className="mt-4 w-full rounded-full bg-panel-2 py-2.5 text-[13px] font-semibold text-paper transition hover:bg-[var(--hover)] disabled:opacity-40"
         >
           {loadingMore ? t('common.loading') : t('searchPage.loadMore')}
         </button>
@@ -653,42 +961,49 @@ function EntityDrill({
       <button
         type="button"
         onClick={onBack}
-        className="mb-4 grid h-8 w-8 place-items-center rounded-full border border-hairline text-muted hover:text-paper"
+        title={t('searchPage.backResults')}
+        aria-label={t('searchPage.backResults')}
+        className="mb-5 grid h-9 w-9 place-items-center rounded-full bg-panel-2 text-muted transition hover:bg-[var(--hover)] hover:text-paper"
       >
-        <ArrowLeft className="h-4 w-4" />
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       </button>
 
-      {/* hero：圆形艺人头像 / 方形专辑封面 + 大名（移动端缩小字号并允许两行，长名不再截断） */}
-      <div className="mb-6 flex items-end gap-4 md:gap-6">
+      <div className="mb-8 flex items-center gap-5">
         {drill.coverUrl ? (
           <img
             src={coverSrc(drill.coverUrl)}
-            alt=""
-            className={`h-28 w-28 flex-none object-cover md:h-36 md:w-36 ${
-              drill.type === 'artist' ? 'rounded-full' : 'rounded-lg'
+            alt={drill.name}
+            className={`h-[92px] w-[92px] flex-none object-cover ${
+              drill.type === 'artist' ? 'rounded-full' : 'rounded-md'
             }`}
             style={{ boxShadow: 'var(--cover-shadow)' }}
           />
         ) : (
           <div
-            className={`grid h-28 w-28 flex-none place-items-center bg-panel-2 text-faint md:h-36 md:w-36 ${
-              drill.type === 'artist' ? 'rounded-full' : 'rounded-lg'
+            className={`grid h-[92px] w-[92px] flex-none place-items-center bg-panel-2 text-faint ${
+              drill.type === 'artist' ? 'rounded-full' : 'rounded-md'
             }`}
           >
-            {drill.type === 'artist' ? <User className="h-12 w-12" /> : <Disc3 className="h-12 w-12" />}
+            {drill.type === 'artist' ? (
+              <User className="h-9 w-9" aria-hidden="true" />
+            ) : (
+              <Disc3 className="h-9 w-9" aria-hidden="true" />
+            )}
           </div>
         )}
-        <div className="min-w-0 pb-1">
-          <div className="font-mono text-[11px] tracking-[0.14em] uppercase text-faint">
+        <div className="min-w-0">
+          <div className="text-[12px] font-semibold text-muted">
             {t(drill.type === 'artist' ? 'searchPage.catArtists' : 'searchPage.catAlbums')}
           </div>
-          <h2 className="mt-1 line-clamp-2 font-display text-2xl leading-tight font-semibold md:text-4xl">{drill.name}</h2>
-          {drill.detail && <div className="mt-1.5 line-clamp-2 text-[13px] text-muted">{drill.detail}</div>}
+          <h2 className="mt-1 line-clamp-2 text-4xl leading-none font-bold tracking-tight text-paper md:text-5xl">
+            {drill.name}
+          </h2>
+          {drill.detail && <div className="mt-2 line-clamp-2 text-[13px] text-muted">{drill.detail}</div>}
           {tracks && tracks.length > 0 && (
             <button
               type="button"
               onClick={() => enqueue(tracks.map((track) => track.track_ref))}
-              className="mt-3 rounded-full bg-accent px-4 py-1.5 text-[13px] font-medium text-on-accent hover:brightness-105"
+              className="mt-3 rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-on-accent transition hover:brightness-105"
             >
               {t('batch.addPlaylist')}
             </button>
@@ -720,7 +1035,7 @@ function EntityDrill({
       ) : (
         <>
           {!supportsAlbums && (
-            <h3 className="mb-3 font-mono text-[11px] tracking-[0.14em] uppercase text-faint">
+            <h3 className="mb-4 text-2xl font-bold text-paper">
               {t(drill.type === 'artist' ? 'searchPage.popularTracks' : 'searchPage.tracksTitle')}
             </h3>
           )}

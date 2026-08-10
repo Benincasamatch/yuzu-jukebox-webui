@@ -10,12 +10,12 @@ export type Scheme = 'dark' | 'light';
 const ACCENT_KEY = 'yuzu-accent';
 const SCHEME_KEY = 'yuzu-scheme';
 
-/** accent 上的可读文字色（YIQ 亮度判定） */
+/** accent 上的可读文字色（YIQ 亮度判定；阈值 120 使 #1DB954 绿落到深色文字，与 Spotify 一致） */
 function onAccentFor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 >= 150 ? '#1A1607' : '#F5F2EC';
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 120 ? '#0A1F10' : '#F5F2EC';
 }
 
 export function applyAccent(hex: string, persist = true): void {
