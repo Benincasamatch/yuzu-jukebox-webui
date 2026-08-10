@@ -1,7 +1,9 @@
 /**
  * 入队共享件（SearchView 抽出的共享件）：useEnqueue 分块提交 + 选择式 TrackList。
- * 桌面交互（fine pointer）：双击直接入队；Ctrl/⌘+点选多首；右键菜单提交批量入队。
- * 触屏（coarse pointer）没有 Ctrl/右键：保持点选 + 右下角 EnqueueFab 的旧模型。
+ * 桌面交互（fine pointer）：单击 = 单选；再次单击已选中行 = 入队；Ctrl/⌘+点选多选；
+ * 多选中单击任意行 = 收敛为单选；双击 = 直接入队；点列表空白/Esc = 取消选择；
+ * Ctrl/⌘+A = 全选；右键 = 入队/加入歌单菜单。触屏（coarse pointer）没有
+ * Ctrl/右键：保持点选 + 右下角 EnqueueFab 的旧模型。
  * 任何曲目列表（搜索/钻取/每日推荐/相似小窗）都应复用而非另造交互。
  */
 import {
@@ -16,12 +18,12 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Clock3, GripVertical, ListPlus, Music2, X } from 'lucide-react';
-import type { SearchTrack } from '../api/types';
-import { roomStore } from '../app/session';
+import { Clock3, ChevronLeft, GripVertical, ListMusic, ListPlus, Music2, X } from 'lucide-react';
+import type { PlaylistInfo, SearchTrack } from '../api/types';
+import { api, roomStore } from '../app/session';
 import { coverSrc } from './cover';
 import { formatDateTime, formatMs } from './format';
-import { useMediaQuery, useRoomState } from './hooks';
+import { useIdentity, useMediaQuery, useRoomState } from './hooks';
 import { useShell } from './shellContext';
 import { useToast } from './toast';
 
@@ -92,6 +94,8 @@ export interface TrackSelect {
   selectedRefs: ReadonlySet<string>;
   /** 触屏点选语义需要旧式 toggle（如卡片复选框）时使用 */
   toggle: (trackRef: string) => void;
+  /** Ctrl/⌘+A 全选：由持有曲目数组的一方调用 */
+  selectAll: (refs: string[]) => void;
   clear: () => void;
   rowProps: (track: TrackListTrack) => {
     'aria-selected': boolean;
@@ -105,7 +109,8 @@ export interface TrackSelect {
 
 /**
  * 曲目选择 + 提交（TrackList 与 SearchView 的 all 视图共用）：
- * - 桌面：双击 = 直接入队；Ctrl/⌘+点击 = 切换多选；右键 = 入队菜单
+ * - 桌面：单击 = 单选；再次单击已选中行 = 入队；Ctrl/⌘+点击 = 切换多选；
+ *   多选中单击 = 收敛为单选；双击 = 直接入队；右键 = 入队/加入歌单菜单
  *   （右键未选中的行 = 选中它再开菜单，即单曲右键也可直接入队）。
  * - 触屏：点按切换选中，EnqueueFab 提交（无 Ctrl/右键可用）。
  * rowProps 直接铺到行元素上；menuNode/fabNode 渲染在列表根部。
@@ -116,10 +121,16 @@ export function useTrackSelect(
   const { t } = useTranslation();
   const enqueue = useEnqueue();
   const coarse = useMediaQuery('(pointer: coarse)');
+  const identity = useIdentity();
+  const { show, showError } = useToast();
   const [selectedRefs, setSelectedRefs] = useState<Set<string>>(() => new Set());
   const [menu, setMenu] = useState<{ x: number; y: number; track: TrackListTrack } | null>(
     null,
   );
+  // 右键菜单的歌单子面板：惰性拉取，仅列可编辑歌单（非绑定 + 本人创建或 media_admin）
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [playlists, setPlaylists] = useState<PlaylistInfo[] | null>(null);
+  const [addingTo, setAddingTo] = useState<string | null>(null);
 
   const toggle = (trackRef: string) => {
     setSelectedRefs((current) => {
@@ -132,6 +143,10 @@ export function useTrackSelect(
   const clear = () => {
     setSelectedRefs(new Set());
     setMenu(null);
+    setPickerOpen(false);
+  };
+  const selectAll = (refs: string[]) => {
+    setSelectedRefs(new Set(refs));
   };
 
   const commit = () => {
@@ -139,10 +154,46 @@ export function useTrackSelect(
     clear();
   };
 
+  const openPicker = () => {
+    setPickerOpen(true);
+    if (playlists === null) {
+      api
+        .listPlaylists()
+        .then(setPlaylists)
+        .catch(() => setPlaylists([]));
+    }
+  };
+
+  const addToPlaylist = (playlist: PlaylistInfo) => {
+    if (addingTo) return;
+    const refs = Array.from(selectedRefs);
+    if (refs.length === 0) return;
+    setAddingTo(playlist.id);
+    api
+      .addPlaylistItems(playlist.id, refs)
+      .then(() => {
+        show(t('trackList.addedToPlaylist', { name: playlist.name, count: refs.length }));
+        clear();
+      })
+      .catch(showError)
+      .finally(() => setAddingTo(null));
+  };
+
   const rowProps = (track: TrackListTrack) => ({
     'aria-selected': selectedRefs.has(track.track_ref),
     onClick: (event: MouseEvent) => {
-      if (coarse || event.ctrlKey || event.metaKey) toggle(track.track_ref);
+      if (coarse || event.ctrlKey || event.metaKey) {
+        toggle(track.track_ref);
+        return;
+      }
+      // 单击 = 单选；再次单击已单选行 = 入队；多选中单击 = 收敛为单选
+      const selected = selectedRefs.has(track.track_ref);
+      if (selected && selectedRefs.size === 1) {
+        clear();
+        enqueue([track.track_ref], track.title);
+        return;
+      }
+      setSelectedRefs(new Set([track.track_ref]));
     },
     onDoubleClick: () => {
       if (coarse) return;
@@ -154,13 +205,17 @@ export function useTrackSelect(
       setSelectedRefs((current) =>
         current.has(track.track_ref) ? current : new Set([track.track_ref]),
       );
+      setPickerOpen(false);
       setMenu({ x: event.clientX, y: event.clientY, track });
     },
   });
 
   // 菜单外点击 / Esc 关闭（portal 到 body，捕获阶段判定归属）
   useEffect(() => {
-    if (!menu) return;
+    if (!menu) {
+      setPickerOpen(false);
+      return;
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setMenu(null);
     };
@@ -177,54 +232,97 @@ export function useTrackSelect(
   }, [menu]);
 
   const additionalItems = menu ? (extraItems?.(menu.track) ?? []) : [];
+  // 可编辑歌单：非绑定（绑定歌单 items 写会被服务端 409）且本人创建或 media_admin
+  const isMediaAdmin = identity?.roles.includes('media_admin') ?? false;
+  const editablePlaylists = (playlists ?? []).filter(
+    (playlist) =>
+      !playlist.bound_provider && (playlist.created_by === identity?.id || isMediaAdmin),
+  );
+  const menuItemClass =
+    'flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] text-muted outline-none hover:bg-[var(--hover)] hover:text-paper';
   const menuNode =
     menu &&
     createPortal(
       <div
         data-track-menu
-        className="menu-content fixed z-50 w-44 rounded-lg border border-hairline bg-panel-2 p-1.5"
+        className="menu-content fixed z-50 w-48 rounded-lg border border-hairline bg-panel-2 p-1.5"
         style={{
-          left: Math.max(8, Math.min(menu.x, window.innerWidth - 184)),
+          left: Math.max(8, Math.min(menu.x, window.innerWidth - 200)),
           top: Math.max(
             8,
-            Math.min(menu.y, window.innerHeight - 110 - additionalItems.length * 38),
+            Math.min(menu.y, window.innerHeight - 150 - additionalItems.length * 38),
           ),
         }}
       >
-        <button
-          type="button"
-          onClick={commit}
-          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] text-muted outline-none hover:bg-[var(--hover)] hover:text-paper"
-        >
-          <ListPlus className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('trackList.enqueueSelected', { count: selectedRefs.size })}
-        </button>
-        <button
-          type="button"
-          onClick={clear}
-          className="flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] text-muted outline-none hover:bg-[var(--hover)] hover:text-paper"
-        >
-          <X className="h-3.5 w-3.5" aria-hidden="true" />
-          {t('trackList.clearSelection')}
-        </button>
-        {additionalItems.length > 0 && (
-          <div className="mt-1 border-t border-hairline pt-1">
-            {additionalItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={() => {
-                  setMenu(null);
-                  item.onSelect();
-                }}
-                className={`flex w-full cursor-pointer items-center rounded-md px-2.5 py-2 text-left text-[13px] outline-none hover:bg-[var(--hover)] ${
-                  item.danger ? 'text-[#D05A4E]' : 'text-muted hover:text-paper'
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+        {pickerOpen ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setPickerOpen(false)}
+              className={menuItemClass}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('trackList.backToActions')}
+            </button>
+            <div className="mt-1 max-h-56 overflow-y-auto border-t border-hairline pt-1">
+              {playlists === null && (
+                <p className="px-2.5 py-2 text-[13px] text-faint">{t('common.loading')}</p>
+              )}
+              {playlists !== null && editablePlaylists.length === 0 && (
+                <p className="px-2.5 py-2 text-[13px] text-faint">
+                  {t('trackList.noEditablePlaylists')}
+                </p>
+              )}
+              {editablePlaylists.map((playlist) => (
+                <button
+                  key={playlist.id}
+                  type="button"
+                  disabled={addingTo !== null}
+                  onClick={() => addToPlaylist(playlist)}
+                  className={`${menuItemClass} justify-between disabled:opacity-40`}
+                >
+                  <span className="truncate">{playlist.name}</span>
+                  <span className="flex-none font-mono text-[11px] text-faint tabular-nums">
+                    {playlist.track_count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            <button type="button" onClick={commit} className={menuItemClass}>
+              <ListPlus className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('trackList.enqueueSelected', { count: selectedRefs.size })}
+            </button>
+            <button type="button" onClick={openPicker} className={menuItemClass}>
+              <ListMusic className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('trackList.addToPlaylist')}
+            </button>
+            <button type="button" onClick={clear} className={menuItemClass}>
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+              {t('trackList.clearSelection')}
+            </button>
+            {additionalItems.length > 0 && (
+              <div className="mt-1 border-t border-hairline pt-1">
+                {additionalItems.map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      setMenu(null);
+                      item.onSelect();
+                    }}
+                    className={`flex w-full cursor-pointer items-center rounded-md px-2.5 py-2 text-left text-[13px] outline-none hover:bg-[var(--hover)] ${
+                      item.danger ? 'text-[#D05A4E]' : 'text-muted hover:text-paper'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>,
       document.body,
@@ -234,7 +332,7 @@ export function useTrackSelect(
     <EnqueueFab count={selectedRefs.size} onCommit={commit} />
   ) : null;
 
-  return { selectedRefs, toggle, clear, rowProps, menuNode, fabNode };
+  return { selectedRefs, toggle, selectAll, clear, rowProps, menuNode, fabNode };
 }
 
 /** 选中数 >0 时出现的圆形入队按钮；portal 到 body（fixed 不被祖先 transform 劫持）。 */
@@ -557,7 +655,17 @@ export function TrackList({
       : null;
 
   return (
-    <div>
+    <div
+      onKeyDown={(event) => {
+        // Ctrl/⌘+A 全选（焦点在任意行上时冒泡到这里）；Esc 取消选择
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
+          event.preventDefault();
+          select.selectAll(tracks.map((track) => track.track_ref));
+        } else if (event.key === 'Escape') {
+          select.clear();
+        }
+      }}
+    >
       {select.menuNode}
       {select.fabNode}
       <div className="overflow-x-auto">
@@ -577,7 +685,14 @@ export function TrackList({
             </span>
             {onRemoveItem && <span aria-hidden="true" />}
           </div>
-          <div ref={listRef} className="relative py-1">
+          <div
+            ref={listRef}
+            className="relative py-1"
+            onClick={(event) => {
+              // 点列表空白（行间空隙/内边距）= 取消选择，不依赖右键菜单
+              if (event.target === event.currentTarget) select.clear();
+            }}
+          >
             {indicatorTop !== null && (
               <span
                 aria-hidden="true"

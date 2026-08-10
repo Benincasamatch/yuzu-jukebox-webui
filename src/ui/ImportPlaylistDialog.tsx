@@ -22,10 +22,15 @@ export function ImportPlaylistDialog({
   open,
   onOpenChange,
   onImported,
+  initialProvider,
+  initialPlaylistId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onImported: (playlist: PlaylistInfo) => void;
+  /** 预填（搜索页外部歌单导入）：打开时锁定到该 provider + 歌单 ID，用户只需选是否绑定 */
+  initialProvider?: string;
+  initialPlaylistId?: string;
 }): JSX.Element {
   const { t } = useTranslation();
   const providers = useProviders();
@@ -44,15 +49,16 @@ export function ImportPlaylistDialog({
     setProvider(providers.some((item) => item.id === 'ncm') ? 'ncm' : providers[0].id);
   }, [provider, providers]);
 
-  // 每次打开重置表单（provider 保留校正结果）
+  // 每次打开重置表单（provider 保留校正结果；预填场景锁定 provider + 歌单 ID）
   useEffect(() => {
     if (!open) return;
     setMode('external');
-    setPlaylistId('');
+    setPlaylistId(initialPlaylistId ?? '');
     setSource('');
     setName('');
     setBind(false);
-  }, [open]);
+    if (initialProvider) setProvider(initialProvider);
+  }, [open, initialProvider, initialPlaylistId]);
 
   const externalReady = provider !== '' && playlistId.trim() !== '';
   const ready = mode === 'external' ? externalReady : source.trim() !== '';

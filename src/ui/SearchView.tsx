@@ -2,7 +2,9 @@
  * 搜索页：顶栏搜索框的落点。URL 驱动（?q= &p=），无独立导航入口。
  * 分类 chips 由 provider 的 capabilities.search_categories 驱动——
  * 只渲染服务端报告的分类（能力不对称是正常状态，不占位造假）。
- * artist/album 实体可钻取为可入队曲目；playlist 实体走导入（media_admin）。
+ * artist/album 实体钻取为曲目页；playlist 实体在 provider 有 playlist
+ * 电台源时经 /radio/tracks 物化为只读曲目页（spec §6.2.2：playlist 不经
+ * searchEntity 钻取），否则落导入对话框（media_admin，可选绑定跟随）。
  */
 import { useEffect, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +28,7 @@ import { useIdentity, useProviders, useRoomState } from './hooks';
 import { coverSrc } from './cover';
 import { formatMs } from './format';
 import { composeSource, entityRadioSource } from './radioSources';
+import { ImportPlaylistDialog } from './ImportPlaylistDialog';
 import { TrackList, useEnqueue, useTrackSelect, type TrackSelect } from './TrackList';
 import { useToast } from './toast';
 import { SEARCH_PROVIDER_KEY, useShell } from './AppShell';
@@ -41,7 +44,7 @@ const CHIP_KEYS: Record<Chip, string> = {
 };
 
 interface DrillTarget {
-  type: 'artist' | 'album';
+  type: 'artist' | 'album' | 'playlist';
   id: string;
   name: string;
   coverUrl?: string;
@@ -64,6 +67,16 @@ export default function SearchView(): JSX.Element {
 
   const [category, setCategory] = useState<Chip>('all');
   const [drill, setDrill] = useState<DrillTarget | null>(null);
+  // 外部歌单导入：打开预填的导入对话框（可选绑定跟随），成功后落本地歌单页
+  const [importTarget, setImportTarget] = useState<{
+    provider: string;
+    playlistId: string;
+  } | null>(null);
+  const requestImport = (entityProvider: string, entity: SearchEntity) => {
+    if (entity.entity_id) {
+      setImportTarget({ provider: entityProvider, playlistId: entity.entity_id });
+    }
+  };
 
   // 换词/换源：回全部、退出钻取；provider 不支持当前分类时同样回退
   useEffect(() => {
@@ -160,18 +173,46 @@ export default function SearchView(): JSX.Element {
       {!query && <p className="py-16 text-center text-sm text-muted">{t('searchPage.noQuery')}</p>}
 
       {query && drill !== null && (
-        <EntityDrill provider={provider} drill={drill} onBack={() => setDrill(null)} onDrill={setDrill} />
+        <EntityDrill
+          provider={provider}
+          drill={drill}
+          onBack={() => setDrill(null)}
+          onDrill={setDrill}
+          onImportRequest={(entity) => requestImport(provider, entity)}
+        />
       )}
 
       {query &&
         drill === null &&
         (category === 'all' ? (
-          <AllResults provider={provider} query={query} supported={supported} onDrill={setDrill} />
+          <AllResults
+            provider={provider}
+            query={query}
+            supported={supported}
+            onDrill={setDrill}
+            onImportRequest={(entity) => requestImport(provider, entity)}
+          />
         ) : category === 'song' ? (
           <SongResults provider={provider} query={query} />
         ) : (
-          <EntitySection provider={provider} query={query} category={category} onDrill={setDrill} />
+          <EntitySection
+            provider={provider}
+            query={query}
+            category={category}
+            onDrill={setDrill}
+            onImportRequest={(entity) => requestImport(provider, entity)}
+          />
         ))}
+
+      <ImportPlaylistDialog
+        open={importTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setImportTarget(null);
+        }}
+        initialProvider={importTarget?.provider}
+        initialPlaylistId={importTarget?.playlistId}
+        onImported={(playlist) => navigate(`/playlist/${encodeURIComponent(playlist.id)}`)}
+      />
     </div>
   );
 }
@@ -194,17 +235,19 @@ function AllResults({
   query,
   supported,
   onDrill,
+  onImportRequest,
 }: {
   provider: string;
   query: string;
   supported: SearchCategory[];
   onDrill: (target: DrillTarget) => void;
+  onImportRequest: (entity: SearchEntity) => void;
 }) {
   const { t } = useTranslation();
   const { showError } = useToast();
   const enqueue = useEnqueue();
   const select = useTrackSelect();
-  const actions = useEntityActions(provider, onDrill);
+  const actions = useEntityActions(provider, onDrill, onImportRequest);
   const [tracks, setTracks] = useState<SearchTrack[] | null>(null);
   const [entities, setEntities] = useState<EntityHit[] | null>(null);
   const entityCategories = supported.filter(
@@ -321,7 +364,16 @@ function CompactSongs({
   return (
     <section>
       <h2 className="mb-3 text-2xl font-bold text-paper">{t('searchPage.catSongs')}</h2>
-      <div>
+      <div
+        onKeyDown={(event) => {
+          if ((event.ctrlKey || event.metaKey) && (event.key === 'a' || event.key === 'A')) {
+            event.preventDefault();
+            select.selectAll(tracks.map((track) => track.track_ref));
+          } else if (event.key === 'Escape') {
+            select.clear();
+          }
+        }}
+      >
         {tracks.slice(0, 4).map((track) => {
           const selected = select.selectedRefs.has(track.track_ref);
           return (
@@ -441,15 +493,17 @@ function EntitySection({
   query,
   category,
   onDrill,
+  onImportRequest,
 }: {
   provider: string;
   query: string;
   category: EntityCategory;
   onDrill: (target: DrillTarget) => void;
+  onImportRequest: (entity: SearchEntity) => void;
 }) {
   const { t } = useTranslation();
   const { showError } = useToast();
-  const actions = useEntityActions(provider, onDrill);
+  const actions = useEntityActions(provider, onDrill, onImportRequest);
   const [results, setResults] = useState<SearchEntity[] | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
 
@@ -490,15 +544,28 @@ function EntitySection({
   return (
     <section>
       <h2 className="mb-4 text-2xl font-bold text-paper">{t(CHIP_KEYS[category])}</h2>
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5">
-        {results.map((entity) => (
-          <EntityCard
-            key={`${category}:${entity.entity_id ?? entity.name}`}
-            hit={{ category, entity }}
-            actions={actions}
-          />
-        ))}
-      </div>
+      {category === 'artist' ? (
+        // 歌手保留卡片墙（圆形头像语义）；专辑/歌单为列表行
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5">
+          {results.map((entity) => (
+            <EntityCard
+              key={`${category}:${entity.entity_id ?? entity.name}`}
+              hit={{ category, entity }}
+              actions={actions}
+            />
+          ))}
+        </div>
+      ) : (
+        <div>
+          {results.map((entity) => (
+            <EntityRow
+              key={`${category}:${entity.entity_id ?? entity.name}`}
+              hit={{ category, entity }}
+              actions={actions}
+            />
+          ))}
+        </div>
+      )}
       {results.length % PAGE_SIZE === 0 && (
         <button
           type="button"
@@ -513,10 +580,93 @@ function EntitySection({
   );
 }
 
+/** 专辑/歌单搜索结果行：封面小图 + 名称/副信息 + 操作，点击进入曲目页。 */
+function EntityRow({
+  hit,
+  actions,
+}: {
+  hit: EntityHit;
+  actions: EntityActions;
+}): JSX.Element {
+  const { t } = useTranslation();
+  const { category, entity } = hit;
+  const Icon = ENTITY_ICONS[category];
+  const dead = !entity.entity_id || (category === 'playlist' && actions.playlistDisabled);
+
+  return (
+    <div
+      role="button"
+      tabIndex={dead ? -1 : 0}
+      aria-disabled={dead}
+      title={dead && category === 'playlist' ? t('searchPage.importNeedAdmin') : undefined}
+      onClick={() => {
+        if (!dead) actions.open(hit);
+      }}
+      onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (!dead && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          actions.open(hit);
+        }
+      }}
+      className={`flex items-center gap-3.5 rounded-md px-2.5 py-2.5 text-left transition-colors ${
+        dead ? 'opacity-50' : 'cursor-pointer hover:bg-[var(--hover)]'
+      }`}
+    >
+      {entity.cover_url ? (
+        <img
+          src={coverSrc(entity.cover_url)}
+          alt={entity.name ?? ''}
+          className="h-12 w-12 flex-none rounded-md object-cover"
+        />
+      ) : (
+        <span className="grid h-12 w-12 flex-none place-items-center rounded-md bg-panel-2 text-faint">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14px] font-semibold text-paper">{entity.name}</span>
+        {entity.detail && (
+          <span className="mt-0.5 block truncate text-[13px] text-muted">{entity.detail}</span>
+        )}
+      </span>
+      {category === 'playlist' && (actions.canPlayAsRadio || actions.canImport) && (
+        <span className="flex flex-none gap-1">
+          {actions.canPlayAsRadio && (
+            <button
+              type="button"
+              title={t('searchPage.playAsRadio')}
+              onClick={(event) => {
+                event.stopPropagation();
+                actions.playAsRadio(entity);
+              }}
+              className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-panel-2 hover:text-paper"
+            >
+              <Radio className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+          {actions.canImport && (
+            <button
+              type="button"
+              title={t('searchPage.importAction')}
+              onClick={(event) => {
+                event.stopPropagation();
+                actions.importEntity(entity);
+              }}
+              className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-panel-2 hover:text-paper"
+            >
+              <ListPlus className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface EntityActions {
   canImport: boolean;
   canPlayAsRadio: boolean;
-  importBusy: boolean;
   playlistDisabled: boolean;
   open: (hit: EntityHit) => void;
   importEntity: (entity: SearchEntity) => void;
@@ -526,30 +676,16 @@ interface EntityActions {
 function useEntityActions(
   provider: string,
   onDrill: (target: DrillTarget) => void,
+  onImportRequest: (entity: SearchEntity) => void,
 ): EntityActions {
   const { t } = useTranslation();
   const { show, showError } = useToast();
-  const navigate = useNavigate();
   const identity = useIdentity();
   const state = useRoomState();
   const providers = useProviders();
   const { canRadio, setRoomsOpen } = useShell();
-  const [importBusy, setImportBusy] = useState(false);
   const canImport = identity?.roles.includes('media_admin') ?? false;
   const radioSource = entityRadioSource(providers, provider);
-
-  const importEntity = (entity: SearchEntity) => {
-    if (!entity.entity_id || !canImport || importBusy) return;
-    setImportBusy(true);
-    void api
-      .importPlaylist({ provider, playlist_id: entity.entity_id })
-      .then((playlist) => {
-        show(t('searchPage.imported', { name: playlist.name }));
-        navigate(`/playlist/${encodeURIComponent(playlist.id)}`);
-      })
-      .catch(showError)
-      .finally(() => setImportBusy(false));
-  };
 
   const playAsRadio = (entity: SearchEntity) => {
     if (!entity.entity_id || !radioSource) return;
@@ -573,9 +709,20 @@ function useEntityActions(
   const open = (hit: EntityHit) => {
     const { category, entity } = hit;
     if (!entity.entity_id) return;
+    // playlist：有 playlist 电台源 → 物化为只读曲目页查看（不直接开电台）；
+    // 无电台源（qq/bili 无 playlist 源）→ 导入对话框（可选绑定跟随）落库查看
     if (category === 'playlist') {
-      if (radioSource) playAsRadio(entity);
-      else importEntity(entity);
+      if (radioSource) {
+        onDrill({
+          type: 'playlist',
+          id: entity.entity_id,
+          name: entity.name ?? '',
+          coverUrl: entity.cover_url,
+          detail: entity.detail,
+        });
+      } else {
+        onImportRequest(entity);
+      }
       return;
     }
     onDrill({
@@ -590,10 +737,9 @@ function useEntityActions(
   return {
     canImport,
     canPlayAsRadio: Boolean(radioSource),
-    importBusy,
     playlistDisabled: !radioSource && !canImport,
     open,
-    importEntity,
+    importEntity: onImportRequest,
     playAsRadio,
   };
 }
@@ -628,11 +774,17 @@ function EntityCard({
           actions.open(hit);
         }
       }}
-      className={`group rounded-lg bg-[var(--hover)] p-3 text-left transition-colors hover:bg-panel-2 ${
-        dead ? 'opacity-50' : 'cursor-pointer'
-      } ${className}`}
+      className={`group rounded-lg p-3 text-left transition-colors ${
+        category === 'artist'
+          ? 'bg-transparent hover:bg-[var(--hover)]'
+          : 'bg-[var(--hover)] hover:bg-panel-2'
+      } ${dead ? 'opacity-50' : 'cursor-pointer'} ${className}`}
     >
-      <div className="relative aspect-square w-full">
+      <div
+        className={`relative aspect-square w-full ${
+          category === 'artist' ? 'mx-auto max-w-32' : ''
+        }`}
+      >
         {entity.cover_url ? (
           <img
             src={coverSrc(entity.cover_url)}
@@ -674,12 +826,11 @@ function EntityCard({
             <button
               type="button"
               title={t('searchPage.importAction')}
-              disabled={actions.importBusy}
               onClick={(event) => {
                 event.stopPropagation();
                 actions.importEntity(entity);
               }}
-              className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper disabled:opacity-40"
+              className="grid h-8 w-8 place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper"
             >
               <ListPlus className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -792,12 +943,11 @@ function TopResultCard({
             <button
               type="button"
               title={t('searchPage.importAction')}
-              disabled={actions.importBusy}
               onClick={(event) => {
                 event.stopPropagation();
                 actions.importEntity(entity);
               }}
-              className="grid h-9 w-9 place-items-center rounded-full text-muted transition hover:bg-hall hover:text-paper disabled:opacity-40"
+              className="grid h-9 w-9 place-items-center rounded-full text-muted transition hover:bg-hall hover:text-paper"
             >
               <ListPlus className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -908,18 +1058,29 @@ function EntityDrill({
   drill,
   onBack,
   onDrill,
+  onImportRequest,
 }: {
   provider: string;
   drill: DrillTarget;
   onBack: () => void;
   onDrill: (target: DrillTarget) => void;
+  onImportRequest: (entity: SearchEntity) => void;
 }) {
   const { t } = useTranslation();
   const { showError } = useToast();
   const enqueue = useEnqueue();
   const providers = useProviders();
+  const identity = useIdentity();
+  const canImport = identity?.roles.includes('media_admin') ?? false;
   const [tracks, setTracks] = useState<SearchTrack[] | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // playlist 钻取：经 /radio/tracks 物化（只读，不落库、不开电台）；
+  // artist/album 走 searchEntity 钻取
+  const radioSource = entityRadioSource(providers, provider);
+  const playlistSource =
+    drill.type === 'playlist' && radioSource
+      ? composeSource(provider, radioSource, undefined, drill.id)
+      : null;
   // 歌手页视图：热门曲目 / 专辑（后者仅当 provider 报告 entity_albums 能力）
   const supportsAlbums =
     drill.type === 'artist' &&
@@ -930,8 +1091,13 @@ function EntityDrill({
     setTracks(null);
     setView('tracks');
     let dead = false;
-    api
-      .searchEntity(provider, drill.type, drill.id, { limit: PAGE_SIZE })
+    const request =
+      drill.type === 'playlist'
+        ? playlistSource
+          ? api.radioTracks(playlistSource, { limit: PAGE_SIZE }).then((r) => r.tracks)
+          : Promise.resolve<SearchTrack[]>([])
+        : api.searchEntity(provider, drill.type, drill.id, { limit: PAGE_SIZE });
+    request
       .then((list) => {
         if (!dead) setTracks(list);
       })
@@ -944,13 +1110,23 @@ function EntityDrill({
     return () => {
       dead = true;
     };
-  }, [provider, drill, showError]);
+  }, [provider, drill, playlistSource, showError]);
 
   const loadMore = () => {
     if (!tracks || loadingMore) return;
     setLoadingMore(true);
-    api
-      .searchEntity(provider, drill.type, drill.id, { limit: PAGE_SIZE, offset: tracks.length })
+    const request =
+      drill.type === 'playlist'
+        ? playlistSource
+          ? api
+              .radioTracks(playlistSource, { limit: PAGE_SIZE, offset: tracks.length })
+              .then((r) => r.tracks)
+          : Promise.resolve<SearchTrack[]>([])
+        : api.searchEntity(provider, drill.type, drill.id, {
+            limit: PAGE_SIZE,
+            offset: tracks.length,
+          });
+    request
       .then((more) => setTracks((current) => [...(current ?? []), ...more]))
       .catch(showError)
       .finally(() => setLoadingMore(false));
@@ -984,30 +1160,49 @@ function EntityDrill({
               drill.type === 'artist' ? 'rounded-full' : 'rounded-md'
             }`}
           >
-            {drill.type === 'artist' ? (
-              <User className="h-9 w-9" aria-hidden="true" />
-            ) : (
-              <Disc3 className="h-9 w-9" aria-hidden="true" />
-            )}
-          </div>
+          {drill.type === 'artist' ? (
+            <User className="h-9 w-9" aria-hidden="true" />
+          ) : drill.type === 'playlist' ? (
+            <ListMusic className="h-9 w-9" aria-hidden="true" />
+          ) : (
+            <Disc3 className="h-9 w-9" aria-hidden="true" />
+          )}
+        </div>
         )}
         <div className="min-w-0">
-          <div className="text-[12px] font-semibold text-muted">
-            {t(drill.type === 'artist' ? 'searchPage.catArtists' : 'searchPage.catAlbums')}
-          </div>
+          <div className="text-[12px] font-semibold text-muted">{t(CHIP_KEYS[drill.type])}</div>
           <h2 className="mt-1 line-clamp-2 text-4xl leading-none font-bold tracking-tight text-paper md:text-5xl">
             {drill.name}
           </h2>
           {drill.detail && <div className="mt-2 line-clamp-2 text-[13px] text-muted">{drill.detail}</div>}
-          {tracks && tracks.length > 0 && (
-            <button
-              type="button"
-              onClick={() => enqueue(tracks.map((track) => track.track_ref))}
-              className="mt-3 rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-on-accent transition hover:brightness-105"
-            >
-              {t('batch.addPlaylist')}
-            </button>
-          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {tracks && tracks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => enqueue(tracks.map((track) => track.track_ref))}
+                className="rounded-full bg-accent px-4 py-1.5 text-[13px] font-semibold text-on-accent transition hover:brightness-105"
+              >
+                {t('batch.addPlaylist')}
+              </button>
+            )}
+            {drill.type === 'playlist' && canImport && (
+              <button
+                type="button"
+                onClick={() =>
+                  onImportRequest({
+                    type: 'playlist',
+                    entity_id: drill.id,
+                    name: drill.name,
+                    cover_url: drill.coverUrl,
+                    detail: drill.detail,
+                  })
+                }
+                className="rounded-full border border-hairline px-4 py-1.5 text-[13px] font-semibold text-paper transition hover:border-faint"
+              >
+                {t('searchPage.importAction')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
