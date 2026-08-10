@@ -1,8 +1,8 @@
 /**
  * 入队共享件（SearchView 抽出的共享件）：useEnqueue 分块提交 + 选择式 TrackList。
- * 桌面交互（fine pointer）：单击 = 单选；再次单击已选中行 = 入队；Ctrl/⌘+点选多选；
- * 多选中单击任意行 = 收敛为单选；双击 = 直接入队；点列表空白/Esc = 取消选择；
- * Ctrl/⌘+A = 全选；右键 = 入队/加入歌单菜单。触屏（coarse pointer）没有
+ * 桌面交互（fine pointer）：单击 = 单选；再次单击已选中行 = 入队（双击手势
+ * 经此分支天然等价于双击入队）；Ctrl/⌘+点选多选；多选中单击任意行 = 收敛为
+ * 单选；点列表空白/Esc = 取消选择；Ctrl/⌘+A = 全选；右键 = 入队/加入歌单菜单。触屏（coarse pointer）没有
  * Ctrl/右键：保持点选 + 右下角 EnqueueFab 的旧模型。
  * 任何曲目列表（搜索/钻取/每日推荐/相似小窗）都应复用而非另造交互。
  */
@@ -100,7 +100,6 @@ export interface TrackSelect {
   rowProps: (track: TrackListTrack) => {
     'aria-selected': boolean;
     onClick: (event: MouseEvent) => void;
-    onDoubleClick: () => void;
     onContextMenu: (event: MouseEvent) => void;
   };
   menuNode: JSX.Element | null;
@@ -109,9 +108,10 @@ export interface TrackSelect {
 
 /**
  * 曲目选择 + 提交（TrackList 与 SearchView 的 all 视图共用）：
- * - 桌面：单击 = 单选；再次单击已选中行 = 入队；Ctrl/⌘+点击 = 切换多选；
- *   多选中单击 = 收敛为单选；双击 = 直接入队；右键 = 入队/加入歌单菜单
- *   （右键未选中的行 = 选中它再开菜单，即单曲右键也可直接入队）。
+ * - 桌面：单击 = 单选；再次单击已单选行 = 入队（双击同此路径，不另挂
+ *   dblclick——否则同一手势入队两次）；Ctrl/⌘+点击 = 切换多选；多选中
+ *   单击 = 收敛为单选；右键 = 入队/加入歌单菜单（右键未选中的行 =
+ *   选中它再开菜单，即单曲右键也可直接入队）。
  * - 触屏：点按切换选中，EnqueueFab 提交（无 Ctrl/右键可用）。
  * rowProps 直接铺到行元素上；menuNode/fabNode 渲染在列表根部。
  */
@@ -186,7 +186,9 @@ export function useTrackSelect(
         toggle(track.track_ref);
         return;
       }
-      // 单击 = 单选；再次单击已单选行 = 入队；多选中单击 = 收敛为单选
+      // 单击 = 单选；再次单击已单选行 = 入队；多选中单击 = 收敛为单选。
+      // 不挂 onDoubleClick：双击 = click×2，第二击走「再击入队」分支即等价
+      // 双击入队——另挂 dblclick 会导致同一手势入队两次。
       const selected = selectedRefs.has(track.track_ref);
       if (selected && selectedRefs.size === 1) {
         clear();
@@ -194,11 +196,6 @@ export function useTrackSelect(
         return;
       }
       setSelectedRefs(new Set([track.track_ref]));
-    },
-    onDoubleClick: () => {
-      if (coarse) return;
-      clear();
-      enqueue([track.track_ref], track.title);
     },
     onContextMenu: (event: MouseEvent) => {
       event.preventDefault();
@@ -747,9 +744,6 @@ export function TrackList({
                     aria-selected={rowProps['aria-selected']}
                     onClick={(event) => {
                       if (!dragRef.current) rowProps.onClick(event);
-                    }}
-                    onDoubleClick={() => {
-                      if (!dragRef.current) rowProps.onDoubleClick();
                     }}
                     onContextMenu={(event) => {
                       if (!dragRef.current) rowProps.onContextMenu(event);
