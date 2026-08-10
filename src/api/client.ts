@@ -11,6 +11,7 @@ import type {
   AccelerationInventoryStatus,
   AccelerationRequestsResult,
   AccelerationStatus,
+  ArtistProfile,
   DistributionRequest,
   CreateAccelerationInput,
   UpdateAccelerationInput,
@@ -47,6 +48,8 @@ import type {
   PrincipalInfo,
   QrLoginPollResult,
   QrLoginStartResult,
+  RadioSourceCatalogEntry,
+  RecommendationShelf,
   RoomAccessCode,
   RoomCapabilities,
   RoomControllerGrant,
@@ -60,6 +63,7 @@ import type {
   SearchTrack,
   StatsEntry,
   UpdatePlayerInput,
+  UpdatePlaylistMetaInput,
   UpdateRoomInput,
   UploadMediaMeta,
 } from './types';
@@ -558,6 +562,42 @@ export class ApiClient {
   async listProviders(): Promise<ProviderInfo[]> {
     const result = await this.#json<{ providers: ProviderInfo[] | null }>('/api/v1/providers');
     return asList(result.providers);
+  }
+
+  /** 艺人档案（spec §6.2.4）：本地播放统计 + 最佳努力富化；无历史返回零值档案。 */
+  async artistProfile(name: string): Promise<ArtistProfile> {
+    const result = await this.#json<{ artist: ArtistProfile }>(
+      `/api/v1/artists/${encodeURIComponent(name)}`,
+    );
+    return result.artist;
+  }
+
+  /** 推荐 feed（spec §6.2.4）：空源返回空数组（200，不是 null）。 */
+  async recommendations(): Promise<RecommendationShelf[]> {
+    const result = await this.#json<{ shelves: RecommendationShelf[] | null }>(
+      '/api/v1/recommendations',
+    );
+    return asList(result.shelves);
+  }
+
+  /** 动态电台源目录（spec §6.2.4）：501 = provider 未实现目录能力，调用方按无目录处理。 */
+  async radioCatalog(provider: string): Promise<RadioSourceCatalogEntry[]> {
+    const result = await this.#json<{ sources: RadioSourceCatalogEntry[] | null }>(
+      `/api/v1/providers/${encodeURIComponent(provider)}/radio-catalog`,
+    );
+    return asList(result.sources);
+  }
+
+  /** 歌单元数据 PATCH（创建者或 media_admin）：子集更新、缺省不变；绑定歌单改名 409 playlist_bound。 */
+  async updatePlaylistMeta(
+    id: string,
+    input: UpdatePlaylistMetaInput,
+  ): Promise<PlaylistInfo> {
+    const result = await this.#json<{ playlist: PlaylistInfo }>(
+      `/api/v1/playlists/${encodeURIComponent(id)}`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+    );
+    return result.playlist;
   }
 
   async listPlaylists(): Promise<PlaylistInfo[]> {

@@ -82,6 +82,8 @@ export interface HistoryEntry {
   room_id?: string;
   track_ref: string;
   title: string;
+  /** 入队快照（服务端 2026-08 起下发；旧行可能为空） */
+  artist?: string;
   requested_by: string;
   started_at: number;
   ended_at: number;
@@ -91,6 +93,8 @@ export interface HistoryEntry {
 export interface StatsEntry {
   track_ref: string;
   title: string;
+  /** 最近一次播放的入队快照（同上） */
+  artist?: string;
   play_count: number;
   first_played_at: number;
   last_played_at: number;
@@ -157,8 +161,53 @@ export interface SearchEntity {
 export interface HotTrack {
   track_ref: string;
   title: string;
+  /** 最近一次播放的入队快照（服务端 2026-08 起下发；旧行可能为空） */
+  artist?: string;
   play_count: number;
   last_played_at: number;
+}
+
+/** 艺人档案的曲目统计（spec §6.2.4）：cover_url 恒为 /api/v1/cover/{track_ref} 代理路径。 */
+export interface ArtistTrackStat {
+  track_ref: string;
+  title: string;
+  artist: string;
+  play_count: number;
+  last_played_at: number;
+  cover_url?: string;
+}
+
+/** 艺人档案（GET /api/v1/artists/{name}）：本地统计 + 最佳努力富化（失败仅省略 avatar/bio）。 */
+export interface ArtistProfile {
+  name: string;
+  play_count: number;
+  last_played_at: number;
+  avatar_url?: string;
+  bio?: string;
+  top_tracks: ArtistTrackStat[];
+}
+
+/** 推荐 feed 货架（GET /api/v1/recommendations）：tracks 与 song 搜索元素同构。 */
+export interface RecommendationShelf {
+  /** provider 作用域稳定键（如 toplist:<id>），作 React key */
+  id: string;
+  title: string;
+  tracks: SearchTrack[];
+}
+
+/** 动态电台源目录条目（GET /api/v1/providers/{id}/radio-catalog）：spec 不含 provider 前缀。 */
+export interface RadioSourceCatalogEntry {
+  spec: string;
+  name: string;
+  cover_url?: string;
+  detail?: string;
+}
+
+/** 歌单元数据 PATCH 输入：任意子集，缺省不变。 */
+export interface UpdatePlaylistMetaInput {
+  name?: string;
+  description?: string;
+  pinned?: boolean;
 }
 
 export interface PlaylistInfo {
