@@ -631,7 +631,12 @@ export function RoomAdminPanel({
                         <tbody>
                           {history.map((entry) => (
                             <tr key={`${entry.track_ref}:${entry.started_at}`} className="border-b border-hairline last:border-b-0">
-                              <td className="px-2 py-2.5 text-paper">{entry.title}</td>
+                              <td className="px-2 py-2.5 text-paper">
+                                {entry.title}
+                                {entry.artist && (
+                                  <span className="block text-xs text-faint">{entry.artist}</span>
+                                )}
+                              </td>
                               <td className="px-2 py-2.5 text-muted">
                                 {principalNames.get(entry.requested_by) ??
                                   requesterNames.get(entry.requested_by) ??
@@ -681,7 +686,12 @@ export function RoomAdminPanel({
                         <tbody>
                           {stats.map((entry) => (
                             <tr key={entry.track_ref} className="border-b border-hairline last:border-b-0">
-                              <td className="px-2 py-2.5 text-paper">{entry.title}</td>
+                              <td className="px-2 py-2.5 text-paper">
+                                {entry.title}
+                                {entry.artist && (
+                                  <span className="block text-xs text-faint">{entry.artist}</span>
+                                )}
+                              </td>
                               <td className="px-2 py-2.5 font-mono tabular-nums text-muted">{entry.play_count}</td>
                               <td className="whitespace-nowrap px-2 py-2.5 font-mono text-xs text-muted">
                                 {formatDateTime(entry.last_played_at)}

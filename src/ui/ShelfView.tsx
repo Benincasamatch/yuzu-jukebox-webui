@@ -115,7 +115,9 @@ function HotShelf(): JSX.Element {
           key: entry.track_ref,
           trackRef: entry.track_ref,
           title: entry.title,
-          meta: t('home.playCount', { count: entry.play_count }),
+          meta: entry.artist
+            ? `${entry.artist} · ${t('home.playCount', { count: entry.play_count })}`
+            : t('home.playCount', { count: entry.play_count }),
         })),
       ),
     [t],
@@ -141,7 +143,9 @@ function RecentShelf(): JSX.Element {
           key: `${entry.track_ref}:${entry.ended_at}`,
           trackRef: entry.track_ref,
           title: entry.title,
-          meta: t('home.playedAt', { time: formatClock(entry.ended_at) }),
+          meta: entry.artist
+            ? `${entry.artist} · ${t('home.playedAt', { time: formatClock(entry.ended_at) })}`
+            : t('home.playedAt', { time: formatClock(entry.ended_at) }),
         })),
       ),
     [t],
@@ -177,7 +181,9 @@ function RoomShelf(): JSX.Element {
             key: entry.track_ref,
             trackRef: entry.track_ref,
             title: entry.title,
-            meta: t('home.playCount', { count: entry.play_count }),
+            meta: entry.artist
+              ? `${entry.artist} · ${t('home.playCount', { count: entry.play_count })}`
+              : t('home.playCount', { count: entry.play_count }),
           })),
         );
       })

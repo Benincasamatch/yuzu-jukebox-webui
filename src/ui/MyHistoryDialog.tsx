@@ -61,7 +61,8 @@ export function MyHistoryDialog({
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px]">{entry.title}</div>
-                <div className="mt-0.5 font-mono text-[11px] text-faint">
+                <div className="mt-0.5 truncate font-mono text-[11px] text-faint">
+                  {entry.artist ? `${entry.artist} · ` : ''}
                   {formatClock(entry.ended_at)}
                 </div>
               </div>
