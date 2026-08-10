@@ -12,6 +12,7 @@ import HomeView from './ui/HomeView';
 import SearchView from './ui/SearchView';
 import ShelfView from './ui/ShelfView';
 import PlaylistDetailView from './ui/PlaylistDetailView';
+import ArtistView from './ui/ArtistView';
 import SourceCollectionView from './ui/SourceCollectionView';
 import LibraryView from './ui/LibraryView';
 import RoomDeepLink from './ui/RoomDeepLink';
@@ -115,6 +116,7 @@ export default function App() {
               <Route path="/search" element={<SearchView />} />
               <Route path="/shelf/:kind" element={<ShelfView />} />
               <Route path="/playlist/:playlistId" element={<PlaylistDetailView />} />
+              <Route path="/artist/:name" element={<ArtistView />} />
               <Route path="/source/:spec" element={<SourceCollectionView />} />
               <Route path="/library" element={<LibraryView />} />
               {/* 旧 /room/:id 链接的兼容入口：同样只承担「切房」动作 */}

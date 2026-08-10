@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { ExternalLink, Heart, X } from 'lucide-react';
 import { api } from '../../app/session';
 import { coverSrc } from '../cover';
@@ -87,7 +88,16 @@ export function NowPlayingPanel() {
           <section className="mt-5 flex items-center gap-3">
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-xl font-bold text-paper">{current.title}</h2>
-              <p className="truncate text-[14px] text-muted">{current.artist}</p>
+              <p className="truncate text-[14px]">
+                {current.artist.trim() ? (
+                  <Link
+                    to={`/artist/${encodeURIComponent(current.artist)}`}
+                    className="text-muted transition-colors hover:text-paper hover:underline"
+                  >
+                    {current.artist}
+                  </Link>
+                ) : null}
+              </p>
             </div>
             {current.source_url?.startsWith('http') && (
               <a
@@ -161,7 +171,16 @@ export function NowPlayingPanel() {
 
           <section className="mt-6 rounded-md bg-panel-2 p-4">
             <h3 className="text-[13px] font-semibold text-paper">{t('np.aboutArtist')}</h3>
-            <p className="mt-4 truncate text-base font-bold text-paper">{current.artist}</p>
+            <p className="mt-4 truncate text-base font-bold">
+              {current.artist.trim() ? (
+                <Link
+                  to={`/artist/${encodeURIComponent(current.artist)}`}
+                  className="text-paper transition-colors hover:text-muted hover:underline"
+                >
+                  {current.artist}
+                </Link>
+              ) : null}
+            </p>
             <p className="mt-2 text-[13px] leading-5 text-muted">{t('np.artistPlaceholder')}</p>
           </section>
         </div>

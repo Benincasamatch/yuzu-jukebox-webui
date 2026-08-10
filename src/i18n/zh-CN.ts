@@ -659,6 +659,9 @@ export const zhCN = {
     playedAt: '{{time}} 播放',
     needRoom: '先进入一个房间',
     radioNeedControl: '这个房间的电台由控制者开启',
+    recommendationsLoading: '正在为你挑选…',
+    addShelf: '全部加入队列',
+    addTrack: '将「{{title}}」加入队列',
   },
   shelf: {
     empty: '这里还什么都没有',
@@ -701,6 +704,8 @@ export const zhCN = {
     playlistSource: '歌单作台',
     playlistPick: '选一个歌单作电台…',
     advancedTitle: '高级：直接填曲目源',
+    catalogProvider: '选择榜单来源',
+    catalogTitle: '榜单 / 目录',
   },
   playlistDetail: {
     loadMore: '加载更多',
@@ -952,6 +957,15 @@ export const zhCN = {
     removeItem: '从歌单移除',
     itemDeleted: '曲目已移除',
     itemMoved: '曲目顺序已更新',
+    editMeta: '编辑歌单信息',
+    editMetaTitle: '编辑歌单信息',
+    nameLabel: '名称',
+    descriptionLabel: '描述',
+    pinnedLabel: '将歌单置顶',
+    boundNameHint: '名称由 {{provider}} 管理；描述和置顶仍可修改',
+    saveMeta: '保存歌单信息',
+    savingMeta: '正在保存…',
+    metaUpdated: '歌单信息已更新',
   },
   trackList: {
     title: '标题',
@@ -1013,6 +1027,17 @@ export const zhCN = {
     cancellation_requested: '分发请求已在等待取消确认',
     inventory_scan_invalid: 'Inventory 扫描状态无效或已过期',
     unknown: '未知错误：{{message}}',
+  },
+  artistPage: {
+    eyebrow: '艺人',
+    avatarAlt: '{{name}}的头像',
+    stats: '播放 {{count}} 次 · 最近播放 {{time}}',
+    noStats: '还没有播放记录',
+    addAll: '全部加入队列',
+    topTracks: '热门曲目',
+    empty: '还没有播放记录——点播一首，常听的歌会出现在这里',
+    loadFailed: '艺人档案暂时无法加载',
+    retry: '重新加载',
   },
 } as const;
 

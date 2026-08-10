@@ -17,14 +17,14 @@ import {
   Unlink,
   Upload,
 } from 'lucide-react';
-import type { PlaylistDetail } from '../api/types';
+import type { PlaylistDetail, UpdatePlaylistMetaInput } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { coverSrc } from './cover';
 import { formatDateTime } from './format';
 import { extractGlowColors } from './glow';
 import { useIdentity, useRoomState } from './hooks';
 import { PlaylistCover } from './LibraryList';
-import { ConfirmDialog } from './primitives';
+import { ConfirmDialog, Dialog } from './primitives';
 import { TrackList, type TrackMenuItem, type TrackListTrack } from './TrackList';
 import { useShell } from './AppShell';
 import { useToast } from './toast';
@@ -54,18 +54,29 @@ export default function PlaylistDetailView(): JSX.Element {
   const [busy, setBusy] = useState(false);
   const [managementBusy, setManagementBusy] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [metaEditOpen, setMetaEditOpen] = useState(false);
+  const [metaName, setMetaName] = useState('');
+  const [metaDescription, setMetaDescription] = useState('');
+  const [metaPinned, setMetaPinned] = useState(false);
+  const [metaSaving, setMetaSaving] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [headerColor, setHeaderColor] = useState('var(--panel-2)');
   const [coverFailed, setCoverFailed] = useState(false);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const canManage = identity?.roles.includes('media_admin') ?? false;
+  const canEditMeta = Boolean(
+    identity &&
+      detail &&
+      (detail.playlist.created_by === identity.id || identity.roles.includes('media_admin')),
+  );
 
   useEffect(() => {
     setDetail(null);
     setFailed(false);
     setDeleteOpen(false);
     setEditMode(false);
+    setMetaEditOpen(false);
     setHeaderColor('var(--panel-2)');
     setCoverFailed(false);
     let dead = false;
@@ -91,6 +102,40 @@ export default function PlaylistDetailView(): JSX.Element {
     setFailed(false);
     setHeaderColor('var(--panel-2)');
     setCoverFailed(false);
+  };
+
+  const openMetaEditor = () => {
+    if (!detail || !canEditMeta) return;
+    setMetaName(detail.playlist.name);
+    setMetaDescription(detail.playlist.description);
+    setMetaPinned(Boolean(detail.playlist.pinned));
+    setMetaEditOpen(true);
+  };
+
+  const saveMetadata = async () => {
+    if (!detail || !canEditMeta || metaSaving) return;
+
+    const name = metaName.trim();
+    const description = metaDescription.trim();
+    const changes: UpdatePlaylistMetaInput = {};
+    if (!detail.playlist.bound_provider && name !== detail.playlist.name) changes.name = name;
+    if (description !== detail.playlist.description) changes.description = description;
+    if (metaPinned !== Boolean(detail.playlist.pinned)) changes.pinned = metaPinned;
+    if (Object.keys(changes).length === 0) return;
+
+    setMetaSaving(true);
+    try {
+      const playlist = await api.updatePlaylistMeta(detail.playlist.id, changes);
+      setDetail((current) =>
+        current && current.playlist.id === playlist.id ? { ...current, playlist } : current,
+      );
+      setMetaEditOpen(false);
+      show(t('playlist.metaUpdated'));
+    } catch (error: unknown) {
+      showError(error);
+    } finally {
+      setMetaSaving(false);
+    }
   };
 
   /** 追加下一页（分页契约：GET /playlists/{id}?offset=&limit=，默认 50/上限 200）。 */
@@ -274,6 +319,12 @@ export default function PlaylistDetailView(): JSX.Element {
 
   const bound = Boolean(detail.playlist.bound_provider);
   const canEditItems = canManage && !bound;
+  const normalizedMetaName = metaName.trim();
+  const normalizedMetaDescription = metaDescription.trim();
+  const metadataChanged =
+    (!bound && normalizedMetaName !== detail.playlist.name) ||
+    normalizedMetaDescription !== detail.playlist.description ||
+    metaPinned !== Boolean(detail.playlist.pinned);
   const playLabel = busy ? t('batch.adding') : t('playlist.addAll');
   const tracks: TrackListTrack[] = detail.items.map((item) => ({
     track_ref: item.track_ref,
@@ -406,6 +457,18 @@ export default function PlaylistDetailView(): JSX.Element {
             <Pencil className="h-5 w-5" aria-hidden="true" />
           </button>
         )}
+        {canEditMeta && (
+          <button
+            type="button"
+            disabled={managementBusy || metaSaving}
+            onClick={openMetaEditor}
+            aria-label={t('playlist.editMeta')}
+            title={t('playlist.editMeta')}
+            className="ml-auto grid h-10 w-10 flex-none place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper active:scale-95 disabled:opacity-40"
+          >
+            <Pencil className="h-5 w-5" aria-hidden="true" />
+          </button>
+        )}
         {canManage && (
           <>
             <input
@@ -426,7 +489,7 @@ export default function PlaylistDetailView(): JSX.Element {
                   disabled={managementBusy}
                   aria-label={t('playlist.manage')}
                   title={t('playlist.manage')}
-                  className="ml-auto grid h-10 w-10 flex-none place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper disabled:opacity-40"
+                  className="grid h-10 w-10 flex-none place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper disabled:opacity-40"
                 >
                   <MoreHorizontal className="h-6 w-6" aria-hidden="true" />
                 </button>
@@ -513,6 +576,82 @@ export default function PlaylistDetailView(): JSX.Element {
           />
         )}
       </div>
+
+      {canEditMeta && (
+        <Dialog
+          open={metaEditOpen}
+          onOpenChange={(open) => {
+            if (!open && !metaSaving) setMetaEditOpen(false);
+          }}
+          title={t('playlist.editMetaTitle')}
+        >
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void saveMetadata();
+            }}
+          >
+            <label className="block text-xs text-muted" htmlFor="playlist-meta-name">
+              {t('playlist.nameLabel')}
+            </label>
+            <input
+              id="playlist-meta-name"
+              value={metaName}
+              onChange={(event) => setMetaName(event.target.value)}
+              disabled={bound || metaSaving}
+              required
+              className="mt-1.5 w-full rounded-md border border-hairline bg-panel px-3 py-2 text-[13px] text-paper placeholder:text-faint focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            {bound && (
+              <p className="mt-1.5 text-xs leading-5 text-faint">
+                {t('playlist.boundNameHint', { provider: detail.playlist.bound_provider })}
+              </p>
+            )}
+            <label
+              className="mt-4 block text-xs text-muted"
+              htmlFor="playlist-meta-description"
+            >
+              {t('playlist.descriptionLabel')}
+            </label>
+            <input
+              id="playlist-meta-description"
+              value={metaDescription}
+              onChange={(event) => setMetaDescription(event.target.value)}
+              disabled={metaSaving}
+              className="mt-1.5 w-full rounded-md border border-hairline bg-panel px-3 py-2 text-[13px] text-paper placeholder:text-faint focus:border-accent focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <label className="mt-4 flex items-center gap-2 text-xs text-muted">
+              <input
+                type="checkbox"
+                checked={metaPinned}
+                onChange={(event) => setMetaPinned(event.target.checked)}
+                disabled={metaSaving}
+                className="yuzu-checkbox"
+              />
+              {t('playlist.pinnedLabel')}
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMetaEditOpen(false)}
+                disabled={metaSaving}
+                className="rounded-full border border-hairline px-4 py-1.5 text-[13px] text-muted hover:border-faint hover:text-paper disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="submit"
+                disabled={
+                  metaSaving || !metadataChanged || (!bound && normalizedMetaName.length === 0)
+                }
+                className="rounded-full bg-accent px-4 py-1.5 text-[13px] font-medium text-on-accent hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {metaSaving ? t('playlist.savingMeta') : t('playlist.saveMeta')}
+              </button>
+            </div>
+          </form>
+        </Dialog>
+      )}
 
       {canManage && (
         <ConfirmDialog

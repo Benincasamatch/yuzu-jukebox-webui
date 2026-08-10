@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Library, ListPlus, Plus } from 'lucide-react';
+import { Download, Library, ListPlus, Pin, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { DropdownMenu } from 'radix-ui';
@@ -132,7 +132,15 @@ export function LibraryRail() {
               >
                 <PlaylistCover playlist={playlist} className="h-12 w-12" />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] text-paper">{playlist.name}</span>
+                  <span className="flex min-w-0 items-center gap-1 text-[14px] text-paper">
+                    <span className="truncate">{playlist.name}</span>
+                    {playlist.pinned && (
+                      <Pin
+                        className="h-3 w-3 flex-none text-faint"
+                        aria-hidden="true"
+                      />
+                    )}
+                  </span>
                   <span className="block truncate text-[12px] text-muted">
                     {playlist.bound_provider
                       ? t('shell.libraryBound', { provider: playlist.bound_provider })

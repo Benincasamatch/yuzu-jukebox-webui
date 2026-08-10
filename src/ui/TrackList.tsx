@@ -27,7 +27,12 @@ import { useIdentity, useMediaQuery, useRoomState } from './hooks';
 import { useShell } from './shellContext';
 import { useToast } from './toast';
 
-export type TrackListTrack = SearchTrack & { added_at?: number; ord?: number };
+export type TrackListTrack = Omit<SearchTrack, 'duration_ms'> & {
+  /** 可选：艺人档案等不含时长的来源整列隐藏（仿 album/added_at 的按需列） */
+  duration_ms?: number;
+  added_at?: number;
+  ord?: number;
+};
 
 export interface TrackMenuItem {
   label: string;
@@ -36,11 +41,11 @@ export interface TrackMenuItem {
 }
 
 /** 曲目封面：track.cover_url 为空 = 源站没给封面；回退代理路径让 GetTrack 再试一次。 */
-function trackCover(track: SearchTrack): string {
+function trackCover(track: { cover_url?: string; track_ref: string }): string {
   return coverSrc(track.cover_url || `/api/v1/cover/${encodeURIComponent(track.track_ref)}`);
 }
 
-function TrackCover({ track }: { track: SearchTrack }): JSX.Element {
+function TrackCover({ track }: { track: { cover_url?: string; track_ref: string } }): JSX.Element {
   const [failed, setFailed] = useState(false);
 
   if (failed) {
@@ -618,7 +623,8 @@ export function TrackList({
 
   const showAlbum = tracks.some((track) => track.album !== undefined);
   const showAddedAt = tracks.some((track) => track.added_at !== undefined);
-  // 列按需拼装：拖拽手柄 / 序号 / 标题 / 专辑? / 添加日期? / 时长 / 删除?
+  const showDuration = tracks.some((track) => track.duration_ms !== undefined);
+  // 列按需拼装：拖拽手柄 / 序号 / 标题 / 专辑? / 添加日期? / 时长? / 删除?
   // 动态列走内联样式——Tailwind 构建期扫描，运行时拼的 grid-cols 类不会生成
   const gridTemplateColumns = [
     ...(onMoveItem ? ['24px'] : []),
@@ -626,11 +632,16 @@ export function TrackList({
     'minmax(220px,1fr)',
     ...(showAlbum ? ['minmax(140px,0.55fr)'] : []),
     ...(showAddedAt ? ['minmax(130px,0.5fr)'] : []),
-    '64px',
+    ...(showDuration ? ['64px'] : []),
     ...(onRemoveItem ? ['28px'] : []),
   ].join(' ');
   const columnCount =
-    3 + (onMoveItem ? 1 : 0) + (showAlbum ? 1 : 0) + (showAddedAt ? 1 : 0) + (onRemoveItem ? 1 : 0);
+    2 +
+    (onMoveItem ? 1 : 0) +
+    (showAlbum ? 1 : 0) +
+    (showAddedAt ? 1 : 0) +
+    (showDuration ? 1 : 0) +
+    (onRemoveItem ? 1 : 0);
   const tableWidthClass =
     columnCount >= 6 ? 'min-w-[760px]' : columnCount === 5 ? 'min-w-[620px]' : columnCount === 4 ? 'min-w-[440px]' : 'min-w-[400px]';
 
@@ -676,10 +687,12 @@ export function TrackList({
             <span>{t('trackList.title')}</span>
             {showAlbum && <span>{t('trackList.album')}</span>}
             {showAddedAt && <span>{t('trackList.addedAt')}</span>}
-            <span className="justify-self-end" title={t('trackList.duration')}>
-              <Clock3 className="h-4 w-4" aria-hidden="true" />
-              <span className="sr-only">{t('trackList.duration')}</span>
-            </span>
+            {showDuration && (
+              <span className="justify-self-end" title={t('trackList.duration')}>
+                <Clock3 className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">{t('trackList.duration')}</span>
+              </span>
+            )}
             {onRemoveItem && <span aria-hidden="true" />}
           </div>
           <div
@@ -794,9 +807,11 @@ export function TrackList({
                         {track.added_at === undefined ? '' : formatDateTime(track.added_at)}
                       </span>
                     )}
-                    <span className="justify-self-end text-[13px] text-muted tabular-nums">
-                      {formatMs(track.duration_ms)}
-                    </span>
+                    {showDuration && (
+                      <span className="justify-self-end text-[13px] text-muted tabular-nums">
+                        {track.duration_ms === undefined ? '' : formatMs(track.duration_ms)}
+                      </span>
+                    )}
                     {onRemoveItem && (
                       <button
                         type="button"
