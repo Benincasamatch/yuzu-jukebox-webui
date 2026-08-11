@@ -77,6 +77,12 @@ queueOpen/roomsOpen/nowPlayingOpen 均为派生态，移动端抽屉/弹层共�
   语气：控件说会发生什么；错误不道歉；空态是邀请。
 - **requester 名字解析**：条目自带 `requester_name` 快照优先（服务端 G2），
   缺省查 listeners 表，最后回退身份 ID。
+- **艺人名一律拆分跳转**：曲目 `artist` 是拼接字符串（「塞壬唱片-MSR/F.L.O.A.T
+  (白羽）/张晶」），任何渲染/跳转都经 `ui/artist.tsx` 的 `ArtistLinks` /
+  `splitArtistNames`（`contributors` 的 artist/uploader 角色优先，否则按
+  `/ ／ 、 ， , ； ;` 拆串），不得整串导航 /artist——整串既点不进单个艺人，
+  解析也常撞不到实体。路由参数 react-router 已解码，页面不得再
+  `decodeURIComponent`（含 `%` 的艺人名会双重解码抛 URIError 整树白屏）。
 
 ## 主题系统（三条正交轴）
 

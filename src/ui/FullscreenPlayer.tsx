@@ -16,6 +16,7 @@ import type { Playback } from '../protocol/types';
 import type { LyricLine } from '../player/lyrics';
 import { activeLineIndex } from '../player/lyrics';
 import { extractGlowColors } from './glow';
+import { ArtistLinks } from './artist';
 import { coverSrc, originalCoverSrc } from './cover';
 import { SimilarButton } from './SimilarButton';
 import { pushOverlayCloser, removeOverlayCloser } from './backbutton';
@@ -226,7 +227,12 @@ export function FullscreenPlayer(props: {
           <div className="px-2 pb-9 landscape:flex-1 landscape:pb-0 landscape:text-left">
             <h2 className="text-2xl leading-tight font-bold tracking-tight">{current.title}</h2>
             <div className="mt-1 text-[13px] text-muted">
-              {current.artist}
+              <ArtistLinks
+                artist={current.artist}
+                contributors={current.contributors}
+                trackRef={current.track_ref}
+                onNavigate={onClose}
+              />
               {current.album && <span className="text-faint"> · {current.album}</span>}
             </div>
             <div className="mt-5 px-4 landscape:px-0">
@@ -288,7 +294,12 @@ export function FullscreenPlayer(props: {
             {current.title}
           </h2>
           <div className="mt-2.5 text-lg text-muted">
-            {current.artist}
+            <ArtistLinks
+              artist={current.artist}
+              contributors={current.contributors}
+              trackRef={current.track_ref}
+              onNavigate={onClose}
+            />
             {current.album && <span className="text-faint"> · {current.album}</span>}
           </div>
           <div className={`mt-2 text-xs text-faint ${chromeFade}`}>

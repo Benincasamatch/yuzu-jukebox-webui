@@ -25,6 +25,7 @@ import { extractGlowColors } from './glow';
 import { useIdentity, useRoomState } from './hooks';
 import { PlaylistCover } from './LibraryList';
 import { ConfirmDialog, Dialog } from './primitives';
+import { RadioPlayButton } from './RadioPlayButton';
 import { TrackList, type TrackMenuItem, type TrackListTrack } from './TrackList';
 import { useShell } from './AppShell';
 import { useToast } from './toast';
@@ -331,6 +332,7 @@ export default function PlaylistDetailView(): JSX.Element {
     title: item.title,
     artist: item.artist,
     duration_ms: item.duration_ms,
+    contributors: item.contributors,
     added_at: item.added_at,
     ord: item.ord,
   }));
@@ -441,6 +443,7 @@ export default function PlaylistDetailView(): JSX.Element {
         >
           <Shuffle className="h-6 w-6" aria-hidden="true" />
         </button>
+        <RadioPlayButton source={`playlist:${detail.playlist.id}`} />
         {canEditItems && (
           <button
             type="button"

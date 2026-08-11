@@ -18,6 +18,7 @@ import { GripVertical, X } from 'lucide-react';
 import type { QueueEntry } from '../../protocol/types';
 import { roomStore } from '../../app/session';
 import { useIdentity, useRoomState } from '../hooks';
+import { ArtistLinks } from '../artist';
 import { formatClock, formatMs } from '../format';
 import { useToast } from '../toast';
 import { useShell } from '../shellContext';
@@ -452,7 +453,7 @@ function Ticket({
       <div className="min-w-0">
         <div className="truncate text-sm">{entry.title}</div>
         <div className="mt-0.5 truncate text-xs text-muted">
-          {entry.artist}
+          <ArtistLinks artist={entry.artist} contributors={entry.contributors} trackRef={entry.track_ref} />
           {entry.album ? ` · ${entry.album}` : ''}
         </div>
         <div className="mt-1 flex gap-2 text-[11.5px] text-faint">

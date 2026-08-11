@@ -13,6 +13,7 @@ import { audio, renderer } from '../../app/player';
 import type { AccountPlaylist } from '../../api/types';
 import type { Playback } from '../../protocol/types';
 import { useLyrics } from '../useLyrics';
+import { ArtistLinks } from '../artist';
 import { coverSrc } from '../cover';
 import { SimilarButton } from '../SimilarButton';
 import { useProviders, useRoomState } from '../hooks';
@@ -225,30 +226,40 @@ export function PlayerBar(): JSX.Element {
       {/* 左：当前曲目 */}
       <div className="flex min-w-0 items-center gap-2">
         {current ? (
-          <button
-            type="button"
-            onClick={() => setPlayerOpen(true)}
-            title={t('room.expand')}
-            className="flex min-w-0 items-center gap-3 text-left"
-          >
-            {current.cover_url ? (
-              <img
-                src={coverSrc(current.cover_url)}
-                alt=""
-                className="h-14 w-14 flex-none rounded-md object-cover"
-              />
-            ) : (
-              <div className="h-14 w-14 flex-none rounded-md bg-panel-2" />
-            )}
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPlayerOpen(true)}
+              title={t('room.expand')}
+              className="flex-none"
+            >
+              {current.cover_url ? (
+                <img
+                  src={coverSrc(current.cover_url)}
+                  alt=""
+                  className="h-14 w-14 rounded-md object-cover"
+                />
+              ) : (
+                <div className="h-14 w-14 rounded-md bg-panel-2" />
+              )}
+            </button>
             <span className="min-w-0">
-              <span className="block truncate text-[14px] text-paper hover:underline">
+              <button
+                type="button"
+                onClick={() => setPlayerOpen(true)}
+                title={t('room.expand')}
+                className="block max-w-full truncate text-left text-[14px] text-paper hover:underline"
+              >
                 {current.title}
-              </span>
-              <span className="block truncate text-[12px] text-muted hover:underline">
-                {current.artist}
-              </span>
+              </button>
+              <ArtistLinks
+                artist={current.artist}
+                contributors={current.contributors}
+                trackRef={current.track_ref}
+                className="block truncate text-[12px] text-muted"
+              />
             </span>
-          </button>
+          </div>
         ) : (
           <button
             type="button"
