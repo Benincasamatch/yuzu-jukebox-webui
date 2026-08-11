@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState, type JSX } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Pause, Play, X } from 'lucide-react';
+import { ChevronDown, Pause, Play } from 'lucide-react';
 import { client } from '../app/session';
 import { audio, renderer } from '../app/player';
 import type { Playback } from '../protocol/types';
@@ -43,6 +43,13 @@ export function FullscreenPlayer(props: {
   // chrome 自动隐去：活动后 2.8s 无操作即淡出（光标同隐），任何指针活动唤醒
   const [chromeVisible, setChromeVisible] = useState(true);
   const idleTimerRef = useRef<number | null>(null);
+  // 退出动画：先滑下再卸载（280ms 与 CSS transition 对齐）
+  const [closing, setClosing] = useState(false);
+  const closePlayer = useCallback(() => {
+    if (closing) return;
+    setClosing(true);
+    window.setTimeout(onClose, 280);
+  }, [closing, onClose]);
 
   const wake = useCallback(() => {
     setChromeVisible(true);
@@ -54,11 +61,11 @@ export function FullscreenPlayer(props: {
   useEffect(() => {
     const id = setInterval(forceTick, 1000);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') closePlayer();
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
-    pushOverlayCloser('fullscreen-player', onClose);
+    pushOverlayCloser('fullscreen-player', closePlayer);
     wake();
     const idle = idleTimerRef.current;
     return () => {
@@ -68,7 +75,7 @@ export function FullscreenPlayer(props: {
       document.body.style.overflow = '';
       removeOverlayCloser('fullscreen-player');
     };
-  }, [onClose, wake]);
+  }, [closePlayer, onClose, wake]);
 
   // 起播提前量窗口内推算值为负（本曲还没开始）：钳到 0 再拿去渲染进度条/时间/歌词。
   // 个人暂停时显示本地停住位置（房间仍在播）。
@@ -178,19 +185,23 @@ export function FullscreenPlayer(props: {
   // portal 到 body：任何祖先的 transform/filter/动画都不能影响 fixed 覆盖定位
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-hall ${
+      className={`fullscreen-enter fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-hall ${
         chromeVisible ? '' : 'cursor-none'
+      } ${
+        closing
+          ? 'translate-y-full opacity-0 transition-[transform,opacity] duration-300 ease-out'
+          : ''
       }`}
       onPointerMove={wake}
     >
       {backdrop}
 
       <button
-        onClick={onClose}
+        onClick={closePlayer}
         title={t('room.closePlayer')}
         className={`fixed top-[calc(env(safe-area-inset-top)+1.25rem)] right-[calc(env(safe-area-inset-right)+1.5rem)] z-10 grid h-10 w-10 place-items-center rounded-full border border-white/15 text-muted backdrop-blur-sm after:absolute after:-inset-1 after:content-[''] hover:border-white/35 hover:text-paper bg-black/25 ${chromeFade}`}
       >
-        <X className="h-4.5 w-4.5" />
+        <ChevronDown className="h-4.5 w-4.5" />
       </button>
 
       {/* 移动端：封面/歌词单视图切换（crossfade，点击互切）。 */}
@@ -260,18 +271,22 @@ export function FullscreenPlayer(props: {
         </div>
 
         <div
+          role="button"
+          tabIndex={0}
+          aria-label={t('room.showCover')}
+          onClick={() => setView('cover')}
+          onKeyDown={(e) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setView('cover');
+            }
+          }}
           className={`absolute inset-0 overflow-hidden transition-opacity duration-300 ${
             view === 'lyrics' ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         >
           <div className="h-full px-2 py-12">{lyricsBlock('center')}</div>
-          <button
-            type="button"
-            onClick={() => setView('cover')}
-            className="absolute bottom-6 left-1/2 z-10 -translate-x-1/2 rounded-full border border-white/15 bg-black/25 px-4 py-2.5 text-xs text-muted backdrop-blur-sm hover:text-paper"
-          >
-            {t('room.showCover')}
-          </button>
         </div>
       </div>
 

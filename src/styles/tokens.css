@@ -163,6 +163,18 @@ input.search-input:focus-visible {
 .progress-glide {
   transition: width 1s linear;
 }
+/* 全屏播放页进场：自底部滑入（关闭走 translate-y-full 过渡滑出） */
+@keyframes yuzu-fullscreen-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.fullscreen-enter {
+  animation: yuzu-fullscreen-in 300ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+/* 移动端悬浮播放条进场：自底部滑入（关闭走 translate-y-full 过渡滑出） */
+.miniplayer-enter {
+  animation: yuzu-fullscreen-in 250ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
 
 /* ---------- 全屏舞台动效（prefers-reduced-motion 下全部被下方规则关闭） ---------- */
 /* 极光团漂移：两团反向错相位，制造缓慢呼吸的环境光 */
