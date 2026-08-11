@@ -1,9 +1,10 @@
 /**
  * Android 返回键统一分发（Capacitor 壳）：覆盖层关闭栈，栈顶先收。
  *
- * 根部语义：音乐 App 按返回 = 退到桌面继续放歌（minimizeApp），
+ * 栈底语义：历史栈退无可退时按返回 = 退到桌面继续放歌（minimizeApp），
  * 而不是 finish Activity——Activity 销毁即 WebView 销毁，播放随之静默，
- * 前台服务也失去意义。非根页面先走 history 后退（Web 路由习惯）。
+ * 前台服务也失去意义。可退判定与移动端顶栏返回钮同源：React Router 把
+ * 栈序号写进 history.state.idx（栈顶首条恒为 0），idx > 0 即 history 后退。
  *
  * 浏览器环境完全不装监听器（不接管任何默认行为）。
  */
@@ -40,7 +41,8 @@ export function initBackButton(): void {
       top.close();
       return;
     }
-    if (window.location.pathname !== '/' && window.history.length > 1) {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) {
       window.history.back();
       return;
     }
