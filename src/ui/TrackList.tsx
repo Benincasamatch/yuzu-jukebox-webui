@@ -369,7 +369,8 @@ export function useTrackSelect(
   return { selectedRefs, toggle, selectAll, clear, rowProps, menuNode, fabNode };
 }
 
-/** 选中数 >0 时出现的圆形入队按钮；portal 到 body（fixed 不被祖先 transform 劫持）。 */
+/** 选中数 >0 时出现的圆形入队按钮；portal 到 body（fixed 不被祖先 transform 劫持）。
+ * 出入动画：出现上浮缩放入场，count 归零后先缩小淡出再卸载（防突变）。 */
 export function EnqueueFab({
   count,
   onCommit,
@@ -378,8 +379,21 @@ export function EnqueueFab({
   onCommit: () => void;
 }): JSX.Element | null {
   const { t } = useTranslation();
+  const [rendered, setRendered] = useState(count > 0);
+  const [leaving, setLeaving] = useState(false);
 
-  if (count === 0) return null;
+  useEffect(() => {
+    if (count > 0) {
+      setLeaving(false);
+      setRendered(true);
+    } else if (rendered) {
+      setLeaving(true);
+      const timer = window.setTimeout(() => setRendered(false), 200);
+      return () => window.clearTimeout(timer);
+    }
+  }, [count, rendered]);
+
+  if (!rendered) return null;
 
   const label = `${t('batch.addSelected')} · ${t('batch.selectedCount', { count })}`;
 
@@ -389,13 +403,17 @@ export function EnqueueFab({
       aria-label={label}
       title={label}
       onClick={onCommit}
-      className="fixed right-4 bottom-[calc(var(--chrome-b)+16px)] z-40 grid h-12 w-12 place-items-center rounded-full bg-accent text-on-accent transition-transform active:scale-95 md:right-7"
+      className={`fixed right-4 bottom-[calc(var(--chrome-b)+16px)] z-40 grid h-12 w-12 place-items-center rounded-full bg-accent text-on-accent transition-[transform,opacity] duration-200 ease-out md:right-7 ${
+        leaving ? 'translate-y-2 scale-75 opacity-0' : 'translate-y-0 scale-100 opacity-100'
+      }`}
       style={{ boxShadow: 'var(--toast-shadow)' }}
     >
       <ListPlus className="h-5 w-5" aria-hidden="true" />
-      <span className="absolute -top-1 -right-1 grid min-h-5 min-w-5 place-items-center rounded-full border border-hairline bg-panel-2 px-1 font-mono text-[10px] leading-none text-paper tabular-nums">
-        {count}
-      </span>
+      {count > 0 && (
+        <span className="absolute -top-1 -right-1 grid min-h-5 min-w-5 place-items-center rounded-full border border-hairline bg-panel-2 px-1 font-mono text-[10px] leading-none text-paper tabular-nums">
+          {count}
+        </span>
+      )}
     </button>,
     document.body,
   );
@@ -655,6 +673,8 @@ export function TrackList({
 
   // 移动端只保留 标题/时长 主列（Spotify 移动列表形态），专辑/添加日期在 md 起恢复
   const isDesktop = useMediaQuery('(min-width: 768px)');
+  // 触屏：行内歌手链接屏蔽（防误触跳转）与空白点击不清选共用
+  const coarse = useMediaQuery('(pointer: coarse)');
   const showAlbum = isDesktop && tracks.some((track) => track.album !== undefined);
   const showAddedAt = isDesktop && tracks.some((track) => track.added_at !== undefined);
   const showDuration = tracks.some((track) => track.duration_ms !== undefined);
@@ -716,7 +736,7 @@ export function TrackList({
         <div className={tableWidthClass}>
           <div
             style={{ gridTemplateColumns }}
-            className="grid items-center gap-4 border-b border-hairline px-4 pb-2 text-[13px] text-muted"
+            className="grid items-center gap-4 border-b border-hairline px-4 pb-2 text-[13px] text-muted max-md:border-b-0"
           >
             {onMoveItem && <span aria-hidden="true" />}
             {isDesktop && <span className="text-right">#</span>}
@@ -735,8 +755,9 @@ export function TrackList({
             ref={listRef}
             className="relative py-1"
             onClick={(event) => {
-              // 点列表空白（行间空隙/内边距）= 取消选择，不依赖右键菜单
-              if (event.target === event.currentTarget) select.clear();
+              // 点列表空白（行间空隙/内边距）= 取消选择（触屏不做：滑动后的落点
+              // 常落在空白上，清选会让点选/滚动互相干扰——移动端无右键可依赖）
+              if (!coarse && event.target === event.currentTarget) select.clear();
             }}
           >
             {indicatorTop !== null && (
@@ -834,12 +855,19 @@ export function TrackList({
                       <TrackCover track={track} />
                       <span className="min-w-0">
                         <span className="block truncate text-[14px] text-paper">{track.title}</span>
-                        <ArtistLinks
-                          artist={track.artist}
-                          contributors={track.contributors}
-                          trackRef={track.track_ref}
-                          className="block truncate text-[13px] text-muted"
-                        />
+                        {/* 触屏屏蔽歌手跳转：点歌手副行易误触导航，只保留桌面端可点 */}
+                        {coarse ? (
+                          <span className="block truncate text-[13px] text-muted">
+                            {track.artist}
+                          </span>
+                        ) : (
+                          <ArtistLinks
+                            artist={track.artist}
+                            contributors={track.contributors}
+                            trackRef={track.track_ref}
+                            className="block truncate text-[13px] text-muted"
+                          />
+                        )}
                       </span>
                     </span>
                     {showAlbum && (
