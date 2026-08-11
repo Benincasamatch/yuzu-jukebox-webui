@@ -3,7 +3,8 @@
  * 与 design/mockup.html 的机制一致：只写 CSS 变量，组件无感知。
  */
 
-import { configuredScheme, defaultAccent } from '../config';
+import { defaultAccent } from '../config';
+import { syncSystemBars } from './nativeui';
 
 export type Scheme = 'dark' | 'light';
 
@@ -30,6 +31,7 @@ export function applyAccent(hex: string, persist = true): void {
 
 export function applyScheme(scheme: Scheme, persist = true): void {
   document.documentElement.dataset.scheme = scheme;
+  syncSystemBars(scheme);
   if (persist) localStorage.setItem(SCHEME_KEY, scheme);
   else localStorage.removeItem(SCHEME_KEY);
 }
@@ -42,13 +44,10 @@ export function currentAccent(): string {
   return localStorage.getItem(ACCENT_KEY) || defaultAccent;
 }
 
-/** 应用启动时调用一次：恢复持久化的 accent，挂系统 scheme 监听。 */
+/** 应用启动时调用一次：恢复持久化的 accent。scheme 不跟随系统——默认深色
+ * （index.html 首帧脚本落定），用户切换经 applyScheme 持久化。 */
 export function initTheme(): void {
   applyAccent(currentAccent(), false);
-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-    // 本机锁定或 config 指定 scheme 时，不跟随系统变化
-    if (!localStorage.getItem(SCHEME_KEY) && !configuredScheme) {
-      applyScheme(e.matches ? 'dark' : 'light', false);
-    }
-  });
+  // 初始 scheme 由 index.html 首帧脚本落定，这里只向原生侧同步一次
+  syncSystemBars(currentScheme());
 }

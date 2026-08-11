@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // App 内插件不会被自动发现，且注册必须先于 super.onCreate（v4 起）
         registerPlugin(YuzuMediaPlugin.class);
+        registerPlugin(YuzuSystemBarsPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }
