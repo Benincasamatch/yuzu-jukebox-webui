@@ -227,6 +227,13 @@ PlaylistInfo.pinned、歌单条目 contributors 结构化下发。
 短命端点教训：GET /recommendations 已随 ncm toplist 目录落地删除（2026-08）——
 首页榜单走聚合电台目录，不再有独立推荐 feed 层。
 外部歌单查看 = /radio/tracks 物化（spec 明确 playlist 不经 searchEntity 钻取）。
+**封面代理 CORS 语义**（proxyCover，2026-08）：302 只服务无 `Origin` 头的普通
+`<img>`（no-cors，省带宽）；带 Origin 的 CORS 消费者（crossOrigin img / fetch）
+直接流式回源 + ACAO——重定向目标（源站 CDN）不保证 ACAO 且常是 http 链接，
+canvas 读像素必失败。已知 CDN 主机的 http 链接在出口统一升级 https
+（music.126.net / y.gtimg.cn）。前端配套：hero 封面（艺人头像/歌单封面）显示图
+no-cors + 隐藏 CORS 探针取色（`ui/useCoverColor.ts`），每页多一次缩略图请求，
+浏览器按 CORS 分区缓存。
 IdP 侧待办：新增 PKCE(User-Agent)应用 → 其 client_id 加入服务端
 `oidc.extra_client_ids`；roles 进 ID token 用 Application 级 Token Settings
 或 scope `urn:zitadel:iam:org:projects:roles`（WebUI 授权请求已自动携带后者）。
