@@ -10,6 +10,7 @@ import { ListMusic } from 'lucide-react';
 import type { SearchTrack } from '../api/types';
 import { api } from '../app/session';
 import { useProviders } from './hooks';
+import { RadioPlayButton } from './RadioPlayButton';
 import { TrackList, useEnqueue } from './TrackList';
 import { useToast } from './toast';
 
@@ -29,12 +30,33 @@ export default function SourceCollectionView(): JSX.Element {
   const [loadingMore, setLoadingMore] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  // 展示名：从 provider 能力目录查源名，查不到退回源规格本身
+  // 展示名：先查 provider 静态能力目录（无参源命中）；带参源（qq:top:26 等）
+  // 静态目录查不到，回退到聚合目录 /radio/catalog 按完整 spec 匹配。
   const sep = source.indexOf(':');
-  const title =
+  const staticTitle =
     providers
       ?.find((p) => p.id === source.slice(0, sep))
-      ?.capabilities?.radio_sources?.find((s) => s.spec === source.slice(sep + 1))?.name ?? source;
+      ?.capabilities?.radio_sources?.find((s) => s.spec === source.slice(sep + 1))?.name;
+  const [catalogTitle, setCatalogTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (staticTitle) return;
+    let dead = false;
+    api
+      .radioCatalogAll()
+      .then((entries) => {
+        const hit = entries.find((entry) => entry.spec === source);
+        if (!dead && hit) setCatalogTitle(hit.name);
+      })
+      .catch(() => {
+        // 目录不可用：标题回退原始 spec
+      });
+    return () => {
+      dead = true;
+    };
+  }, [source, staticTitle]);
+
+  const title = catalogTitle ?? staticTitle ?? source;
 
   useEffect(() => {
     if (!source) return;
@@ -112,14 +134,17 @@ export default function SourceCollectionView(): JSX.Element {
             )}
           </div>
         </div>
-        <button
-          type="button"
-          disabled={busy || !tracks || tracks.length === 0}
-          onClick={addAll}
-          className="flex-none rounded-full bg-accent px-4 py-2 text-[13px] font-medium text-on-accent hover:brightness-105 disabled:opacity-40"
-        >
-          {busy ? t('batch.adding') : t('batch.addPlaylist')}
-        </button>
+        <div className="flex flex-none items-center gap-2">
+          <RadioPlayButton source={source} />
+          <button
+            type="button"
+            disabled={busy || !tracks || tracks.length === 0}
+            onClick={addAll}
+            className="flex-none rounded-full bg-accent px-4 py-2 text-[13px] font-medium text-on-accent hover:brightness-105 disabled:opacity-40"
+          >
+            {busy ? t('batch.adding') : t('batch.addPlaylist')}
+          </button>
+        </div>
       </div>
 
       {tracks === null ? (

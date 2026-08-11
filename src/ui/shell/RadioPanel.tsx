@@ -1,98 +1,24 @@
 /**
- * 电台面板：曲目源目录由 provider 能力报告驱动（capabilities.radio_sources），
- * 前端不再硬编码源规格；通用源 playlist:<id> 由房间层提供、恒可用。
- * 启停授权看 capabilities.radio（policy.radio_control 推导），不再是 controller 专属。
+ * 电台状态条（队列面板底部）：电台启动/停止已下沉到内容面——
+ * 榜单/集合页与歌单详情页的「以电台播放」（RadioPlayButton），
+ * 这里只保留「正在漫游 + 停止」。无电台运行时渲染 null。
  */
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { PlaylistInfo, RadioSourceCatalogEntry } from '../../api/types';
-import { api, roomStore } from '../../app/session';
-import { YuzuError } from '../../protocol/types';
-import { coverSrc } from '../cover';
-import { useProviders, useRoomState } from '../hooks';
-import { composeSource, SOURCE_DESC_KEYS } from '../radioSources';
-import { Select } from '../primitives';
-import { useToast } from '../toast';
+import { roomStore } from '../../app/session';
+import { useRoomState } from '../hooks';
 import { useShell } from '../AppShell';
+import { useToast } from '../toast';
 
 export function RadioPanel(): JSX.Element | null {
   const { t } = useTranslation();
   const state = useRoomState();
   const { canRadio } = useShell();
-  const providers = useProviders();
   const { show, showError } = useToast();
   const radio = state.radio;
-
-  const [playlists, setPlaylists] = useState<PlaylistInfo[] | null>(null);
-  const [playlistId, setPlaylistId] = useState('');
-  const [shuffle, setShuffle] = useState(false);
-  const [once, setOnce] = useState(false);
-  const [rawSource, setRawSource] = useState('');
   const [busy, setBusy] = useState(false);
-  const [catalogProvider, setCatalogProvider] = useState('');
-  const [providerCatalogs, setProviderCatalogs] = useState(
-    () => new Map<string, RadioSourceCatalogEntry[]>(),
-  );
-  const pendingCatalogs = useRef(new Set<string>());
 
-  // 只有能启停电台时才需要拉歌单列表（通用源选择器）
-  useEffect(() => {
-    if (!canRadio) return;
-    api
-      .listPlaylists()
-      .then(setPlaylists)
-      .catch(() => setPlaylists([]));
-  }, [canRadio]);
-
-  useEffect(() => {
-    if (!providers?.length || providers.some((provider) => provider.id === catalogProvider)) return;
-    setCatalogProvider(providers[0].id);
-  }, [catalogProvider, providers]);
-
-  useEffect(() => {
-    if (
-      !canRadio ||
-      radio ||
-      !catalogProvider ||
-      providerCatalogs.has(catalogProvider) ||
-      pendingCatalogs.current.has(catalogProvider)
-    ) {
-      return;
-    }
-
-    const providerId = catalogProvider;
-    pendingCatalogs.current.add(providerId);
-    void api
-      .radioCatalog(providerId)
-      .then((entries) => {
-        setProviderCatalogs((current) => new Map(current).set(providerId, entries));
-      })
-      .catch((error: unknown) => {
-        if (
-          error instanceof YuzuError &&
-          (error.code === 'not_supported' ||
-            error.code === 'not_found' ||
-            error.code === '404')
-        ) {
-          setProviderCatalogs((current) => new Map(current).set(providerId, []));
-          return;
-        }
-        showError(error);
-      })
-      .finally(() => pendingCatalogs.current.delete(providerId));
-  }, [canRadio, catalogProvider, providerCatalogs, radio, showError]);
-
-  if (!canRadio && !radio) return null;
-
-  const start = (source: string, sourceShuffle = false, sourceOnce = false) => {
-    if (busy) return;
-    setBusy(true);
-    void roomStore
-      .radioPlay(source, sourceShuffle, sourceOnce)
-      .then(() => show(t('roomAdmin.radioStarted')))
-      .catch(showError)
-      .finally(() => setBusy(false));
-  };
+  if (!radio) return null;
 
   const stop = () => {
     if (busy) return;
@@ -104,191 +30,25 @@ export function RadioPanel(): JSX.Element | null {
       .finally(() => setBusy(false));
   };
 
-  if (radio) {
-    return (
-      <div className="border-t border-hairline px-4.5 py-3">
-        <div className="flex items-center gap-2 text-[12.5px]">
-          <span className="h-1.5 w-1.5 flex-none animate-pulse rounded-full bg-accent" />
-          <span className="min-w-0 truncate font-mono text-xs text-muted">
-            {t('room.radioOn', { source: radio.source })}
-          </span>
-          {canRadio && (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={stop}
-              className="ml-auto flex-none text-xs text-faint hover:text-[#D05A4E] disabled:opacity-40"
-            >
-              {busy ? t('roomAdmin.radioStopping') : t('roomAdmin.radioStop')}
-            </button>
-          )}
-        </div>
-        <p className="mt-1.5 text-[11px] text-faint">{t('room.radioNote')}</p>
-      </div>
-    );
-  }
-
-  const staticCatalog = (providers ?? []).flatMap((p) =>
-    (p.capabilities?.radio_sources ?? []).map((source) => ({ providerId: p.id, source })),
-  );
-  const dynamicCatalog = providerCatalogs.get(catalogProvider);
-  const currentRef = state.playback.current?.track_ref;
-
   return (
-    <div className="border-t border-hairline px-4.5 py-3.5">
-      <div className="font-mono text-[11px] tracking-[0.14em] text-faint">{t('roomAdmin.radioTitle')}</div>
-
-      {staticCatalog.length > 0 && (
-        <div className="mt-2.5 grid grid-cols-2 gap-1.5">
-          {staticCatalog.map(({ providerId, source }) => {
-            const composed = composeSource(providerId, source, currentRef);
-            return (
-              <button
-                key={`${providerId}:${source.spec}`}
-                type="button"
-                disabled={busy || composed === null}
-                title={
-                  composed === null
-                    ? t('radio.seedNeed')
-                    : source.arg
-                      ? undefined
-                      : (SOURCE_DESC_KEYS[source.spec] ? t(SOURCE_DESC_KEYS[source.spec]) : undefined)
-                }
-                onClick={() => start(composed!)}
-                className="rounded-md border border-hairline bg-panel px-2.5 py-2 text-left transition-colors hover:border-accent disabled:opacity-40"
-              >
-                <div className="text-[12.5px]">{source.name ?? source.spec}</div>
-                {SOURCE_DESC_KEYS[source.spec] && (
-                  <div className="mt-0.5 text-[11px] text-faint">{t(SOURCE_DESC_KEYS[source.spec])}</div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {providers && providers.length > 1 && (
-        <Select
-          value={catalogProvider}
-          onValueChange={setCatalogProvider}
-          options={providers.map((provider) => ({ value: provider.id, label: provider.id }))}
-          ariaLabel={t('radio.catalogProvider')}
-          className="mt-3 w-full"
-        />
-      )}
-
-      {dynamicCatalog && dynamicCatalog.length > 0 && (
-        <section className="mt-3">
-          <div className="font-mono text-[11px] tracking-[0.12em] text-faint">
-            {t('radio.catalogTitle')}
-          </div>
-          <div className="mt-1.5 space-y-1.5">
-            {dynamicCatalog.map((entry) => (
-              <button
-                key={entry.spec}
-                type="button"
-                disabled={busy}
-                onClick={() => start(`${catalogProvider}:${entry.spec}`)}
-                className="flex w-full items-center gap-2.5 rounded-md border border-hairline bg-panel px-2 py-1.5 text-left transition-colors hover:border-accent disabled:opacity-40"
-              >
-                {entry.cover_url ? (
-                  <img
-                    src={coverSrc(entry.cover_url)}
-                    alt=""
-                    className="h-9 w-9 flex-none rounded object-cover"
-                  />
-                ) : (
-                  <span className="h-9 w-9 flex-none rounded bg-panel-2" />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[12.5px] text-paper">{entry.name}</span>
-                  {entry.detail && (
-                    <span className="mt-0.5 block truncate text-[11px] text-muted">
-                      {entry.detail}
-                    </span>
-                  )}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {playlists && playlists.length > 0 && (
-        <div className="mt-3">
-          <Select
-            value={playlistId}
-            onValueChange={setPlaylistId}
-            options={[
-              { value: '', label: t('radio.playlistPick') },
-              ...playlists.map((p) => ({
-                value: p.id,
-                label: `${p.name} · ${t('batch.trackCount', { count: p.track_count })}`,
-              })),
-            ]}
-            ariaLabel={t('radio.playlistSource')}
-            className="w-full"
-          />
-          {playlistId && (
-            <div className="mt-2 flex items-center gap-3">
-              <label className="flex items-center gap-1.5 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  checked={shuffle}
-                  onChange={(e) => setShuffle(e.target.checked)}
-                  className="yuzu-checkbox"
-                />
-                {t('roomAdmin.radioShuffle')}
-              </label>
-              <label className="flex items-center gap-1.5 text-xs text-muted">
-                <input
-                  type="checkbox"
-                  checked={once}
-                  onChange={(e) => setOnce(e.target.checked)}
-                  className="yuzu-checkbox"
-                />
-                {t('roomAdmin.radioOnce')}
-              </label>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => start(`playlist:${playlistId}`, shuffle, once)}
-                className="ml-auto rounded-full bg-accent px-3.5 py-1 text-xs font-medium text-on-accent hover:brightness-105 disabled:opacity-40"
-              >
-                {t('roomAdmin.radioStart')}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      <details className="mt-3">
-        <summary className="cursor-pointer text-[11px] text-faint hover:text-muted">
-          {t('radio.advancedTitle')}
-        </summary>
-        <form
-          className="mt-2 flex gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const source = rawSource.trim();
-            if (source) start(source);
-          }}
-        >
-          <input
-            value={rawSource}
-            onChange={(event) => setRawSource(event.target.value)}
-            placeholder={t('roomAdmin.radioSourcePlaceholder')}
-            className="min-w-0 flex-1 rounded-md border border-hairline bg-panel px-2.5 py-1.5 font-mono text-[12px] placeholder:text-faint"
-          />
+    <div className="border-t border-hairline px-4.5 py-3">
+      <div className="flex items-center gap-2 text-[12.5px]">
+        <span className="h-1.5 w-1.5 flex-none animate-pulse rounded-full bg-accent" />
+        <span className="min-w-0 truncate font-mono text-xs text-muted">
+          {t('room.radioOn', { source: radio.source })}
+        </span>
+        {canRadio && (
           <button
-            type="submit"
-            disabled={!rawSource.trim() || busy}
-            className="flex-none rounded-full border border-hairline px-3 py-1 text-xs text-muted hover:text-paper disabled:opacity-40"
+            type="button"
+            disabled={busy}
+            onClick={stop}
+            className="ml-auto flex-none text-xs text-faint hover:text-[#D05A4E] disabled:opacity-40"
           >
-            {t('roomAdmin.radioStart')}
+            {busy ? t('roomAdmin.radioStopping') : t('roomAdmin.radioStop')}
           </button>
-        </form>
-      </details>
+        )}
+      </div>
+      <p className="mt-1.5 text-[11px] text-faint">{t('room.radioNote')}</p>
     </div>
   );
 }

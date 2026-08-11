@@ -4,6 +4,7 @@ import type { PlaylistDetail, PlaylistInfo, SearchTrack } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { formatMs } from './format';
 import { Select } from './primitives';
+import { swallowRapidReclick } from './TrackList';
 
 type BatchTab = 'search' | 'playlist';
 
@@ -247,6 +248,7 @@ export function BatchAddPanel({ onToast, onError }: BatchAddPanelProps): JSX.Ele
                       type="button"
                       onClick={(event) => {
                         event.stopPropagation();
+                        if (swallowRapidReclick([track.track_ref])) return;
                         void roomStore
                           .addQueue([track.track_ref])
                           .then(() => onToast(t('room.addedToast', { title: track.title })))

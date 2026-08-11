@@ -49,6 +49,7 @@ import type {
   QrLoginPollResult,
   QrLoginStartResult,
   RadioSourceCatalogEntry,
+  RadioCatalogEntry,
   RecommendationShelf,
   RoomAccessCode,
   RoomCapabilities,
@@ -564,10 +565,11 @@ export class ApiClient {
     return asList(result.providers);
   }
 
-  /** 艺人档案（spec §6.2.4）：本地播放统计 + 最佳努力富化；无历史返回零值档案。 */
-  async artistProfile(name: string): Promise<ArtistProfile> {
+  /** 歌手解析（spec §6.2.4）：名字键解析到 provider 歌手实体；trackRef 可选（NowPlaying 播放曲目锚定，优先用其 provider 解析）。 */
+  async artistProfile(name: string, trackRef?: string): Promise<ArtistProfile> {
+    const query = trackRef ? `?track_ref=${encodeURIComponent(trackRef)}` : '';
     const result = await this.#json<{ artist: ArtistProfile }>(
-      `/api/v1/artists/${encodeURIComponent(name)}`,
+      `/api/v1/artists/${encodeURIComponent(name)}${query}`,
     );
     return result.artist;
   }
@@ -586,6 +588,14 @@ export class ApiClient {
       `/api/v1/providers/${encodeURIComponent(provider)}/radio-catalog`,
     );
     return asList(result.sources);
+  }
+
+  /** 聚合电台源目录（spec §6.2.4）：全部 provider 的可枚举有限源实例，空目录返回 []（200，非 null）。 */
+  async radioCatalogAll(): Promise<RadioCatalogEntry[]> {
+    const result = await this.#json<{ entries: RadioCatalogEntry[] | null }>(
+      '/api/v1/radio/catalog',
+    );
+    return asList(result.entries);
   }
 
   /** 歌单元数据 PATCH（创建者或 media_admin）：子集更新、缺省不变；绑定歌单改名 409 playlist_bound。 */

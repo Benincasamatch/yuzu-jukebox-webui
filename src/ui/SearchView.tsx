@@ -25,6 +25,7 @@ import {
 import type { SearchCategory, SearchEntity, SearchTrack } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { useIdentity, useProviders, useRoomState } from './hooks';
+import { ArtistLinks } from './artist';
 import { coverSrc } from './cover';
 import { formatMs } from './format';
 import { composeSource, entityRadioSource } from './radioSources';
@@ -402,7 +403,12 @@ function CompactSongs({
               />
               <div className="min-w-0">
                 <div className="truncate text-[14px] text-paper">{track.title}</div>
-                <div className="truncate text-[13px] text-muted">{track.artist}</div>
+                <ArtistLinks
+                  artist={track.artist}
+                  contributors={track.contributors}
+                  trackRef={track.track_ref}
+                  className="block truncate text-[13px] text-muted"
+                />
               </div>
               <span className="text-[12px] text-muted tabular-nums">{formatMs(track.duration_ms)}</span>
               <button
@@ -683,6 +689,7 @@ function useEntityActions(
   const identity = useIdentity();
   const state = useRoomState();
   const providers = useProviders();
+  const navigate = useNavigate();
   const { canRadio, setRoomsOpen } = useShell();
   const canImport = identity?.roles.includes('media_admin') ?? false;
   const radioSource = entityRadioSource(providers, provider);
@@ -709,6 +716,13 @@ function useEntityActions(
   const open = (hit: EntityHit) => {
     const { category, entity } = hit;
     if (!entity.entity_id) return;
+    // 艺人：统一跳歌手页（带 provider+entity 直达，零解析）；专辑/歌单保留钻取/导入
+    if (category === 'artist' && entity.name) {
+      navigate(
+        `/artist/${encodeURIComponent(entity.name)}?provider=${encodeURIComponent(provider)}&entity=${encodeURIComponent(entity.entity_id)}`,
+      );
+      return;
+    }
     // playlist：有 playlist 电台源 → 物化为只读曲目页查看（不直接开电台）；
     // 无电台源（qq/bili 无 playlist 源）→ 导入对话框（可选绑定跟随）落库查看
     if (category === 'playlist') {

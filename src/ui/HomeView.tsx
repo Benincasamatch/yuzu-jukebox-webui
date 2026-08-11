@@ -9,12 +9,14 @@ import { Play } from 'lucide-react';
 import type {
   HistoryEntry,
   HotTrack,
+  RadioCatalogEntry,
   RecommendationShelf,
   SearchTrack,
   StatsEntry,
 } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { ActivityCard } from './ActivityCard';
+import { ChartCard } from './ChartCard';
 import { coverSrc } from './cover';
 import { CoverThumb } from './CoverThumb';
 import { formatClock } from './format';
@@ -35,6 +37,7 @@ export default function HomeView(): JSX.Element {
       </h1>
 
       <RecommendationSection />
+      <ChartsSection />
       <RadioSection />
       <HotSection />
       <RecentSection />
@@ -180,11 +183,73 @@ function RecommendationCard({
   );
 }
 
-// ---------- 随便听听（源目录驱动，按语义分组） ----------
+// ---------- 榜单（可枚举有限电台源实例的内容化呈现） ----------
+
+/** 首页精选上限：每个 provider 1 个代表条目（服务端顺序：静态在前、目录在后）；「显示全部」进 /charts。 */
+const CHARTS_PER_PROVIDER = 1;
+
+function ChartsSection(): JSX.Element | null {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const providers = useProviders();
+  const { showError } = useToast();
+  const [entries, setEntries] = useState<RadioCatalogEntry[] | null>(null);
+
+  useEffect(() => {
+    let dead = false;
+    api
+      .radioCatalogAll()
+      .then((rows) => {
+        if (!dead) setEntries(rows);
+      })
+      .catch((error: unknown) => {
+        if (dead) return;
+        setEntries([]);
+        showError(error);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [showError]);
+
+  if (entries === null || entries.length === 0) return null;
+
+  const byProvider = new Map<string, number>();
+  const shown = entries.filter((entry) => {
+    const count = byProvider.get(entry.provider) ?? 0;
+    if (count >= CHARTS_PER_PROVIDER) return false;
+    byProvider.set(entry.provider, count + 1);
+    return true;
+  });
+  const hasMore = shown.length < entries.length;
+
+  return (
+    <section className="mt-10">
+      <ShelfHeader
+        title={t('home.chartsTitle')}
+        actionLabel={hasMore ? t('home.showAll') : undefined}
+        onAction={hasMore ? () => navigate('/charts') : undefined}
+      />
+      <ShelfRow>
+        {shown.map((entry) => (
+          <ChartCard
+            key={entry.spec}
+            entry={entry}
+            credentialOk={
+              (providers?.find((p) => p.id === entry.provider)?.credential_status ?? 'none') === 'ok'
+            }
+            className="w-[180px] flex-none"
+          />
+        ))}
+      </ShelfRow>
+    </section>
+  );
+}
+
+// ---------- 随便听听（无限流电台动作：开播即漫游，无列表形态） ----------
 
 function RadioSection(): JSX.Element | null {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const state = useRoomState();
   const { canRadio, setRoomsOpen } = useShell();
   const providers = useProviders();
@@ -199,9 +264,7 @@ function RadioSection(): JSX.Element | null {
     })),
   );
 
-  // finite 无参源是定期刷新的曲目集合，进入集合页；无限流才直接启动电台。
-  // simi 由播放控制区提供；带参源在首页没有参数上下文，不陈列。
-  const collections = catalog.filter((entry) => entry.source.finite && !entry.source.arg);
+  // 无限流才直接启动电台；有限源已内容化进「榜单」区，simi 由播放控制区提供。
   const radios = catalog.filter(
     (entry) => !entry.source.finite && entry.source.spec !== 'simi',
   );
@@ -225,77 +288,42 @@ function RadioSection(): JSX.Element | null {
       .finally(() => setBusy(false));
   };
 
-  if (collections.length === 0 && radios.length === 0) return null;
+  if (radios.length === 0) return null;
 
   return (
-    <>
-      {collections.length > 0 && (
-        <section className="mt-10">
-          <ShelfHeader title={t('home.collectionsTitle')} />
-          <div className={shelfGridClass}>
-            {collections.map(({ providerId, source, credentialOk }) => {
-              const usable = !source.requires_credential || credentialOk;
-              const descKey = SOURCE_DESC_KEYS[source.spec];
-              return (
-                <button
-                  key={`${providerId}:${source.spec}`}
-                  type="button"
-                  disabled={!usable}
-                  title={usable ? undefined : t('radio.credentialNeed')}
-                  onClick={() =>
-                    navigate(`/source/${encodeURIComponent(`${providerId}:${source.spec}`)}`)
-                  }
-                  className={collectionCardClass}
-                >
-                  <div className="text-[15px] font-semibold text-paper">
-                    {source.name ?? source.spec}
-                  </div>
-                  {descKey && (
-                    <div className="mt-1 text-[13px] text-muted">{t(descKey)}</div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
+    <section className="mt-10">
+      <ShelfHeader title={t('home.radioTitle')} />
+      <div className={shelfGridClass}>
+        {radios.map(({ providerId, source, credentialOk, owned }) => {
+          const usable = !source.requires_credential || credentialOk;
+          // 心动模式绑定凭据账号的喜欢列表：非 owner 可开，但先说明基底是谁的口味。
+          const descKey =
+            source.spec === 'heart' && source.requires_credential && !owned
+              ? 'radio.heartBoundHint'
+              : SOURCE_DESC_KEYS[source.spec];
+          return (
+            <button
+              key={`${providerId}:${source.spec}`}
+              type="button"
+              disabled={busy || !usable}
+              title={usable ? undefined : t('radio.credentialNeed')}
+              onClick={() => start(`${providerId}:${source.spec}`)}
+              className={collectionCardClass}
+            >
+              <div className="text-[15px] font-semibold text-paper">
+                {source.name ?? source.spec}
+              </div>
+              {descKey && (
+                <div className="mt-1 text-[13px] text-muted">{t(descKey)}</div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {state.roomId && !canRadio && (
+        <p className="mt-2 text-[11px] text-faint">{t('home.radioNeedControl')}</p>
       )}
-
-      {radios.length > 0 && (
-        <section className="mt-10">
-          <ShelfHeader title={t('home.radioTitle')} />
-          <div className={shelfGridClass}>
-            {radios.map(({ providerId, source, credentialOk, owned }) => {
-              const usable = !source.requires_credential || credentialOk;
-              // 心动模式绑定凭据账号的喜欢列表：非 owner 可开，但先说明基底是谁的口味。
-              const descKey =
-                source.spec === 'heart' && source.requires_credential && !owned
-                  ? 'radio.heartBoundHint'
-                  : SOURCE_DESC_KEYS[source.spec];
-              return (
-                <button
-                  key={`${providerId}:${source.spec}`}
-                  type="button"
-                  disabled={busy || !usable}
-                  title={usable ? undefined : t('radio.credentialNeed')}
-                  onClick={() => start(`${providerId}:${source.spec}`)}
-                  className={collectionCardClass}
-                >
-                  <div className="text-[15px] font-semibold text-paper">
-                    {source.name ?? source.spec}
-                  </div>
-                  {descKey && (
-                    <div className="mt-1 text-[13px] text-muted">{t(descKey)}</div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {state.roomId && !canRadio && (
-            <p className="mt-2 text-[11px] text-faint">{t('home.radioNeedControl')}</p>
-          )}
-        </section>
-      )}
-    </>
+    </section>
   );
 }
 

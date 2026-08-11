@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { ExternalLink, Heart, X } from 'lucide-react';
 import { api } from '../../app/session';
+import type { Contributor } from '../../protocol/types';
+import { ArtistLinks, artistHref, splitArtistNames } from '../artist';
 import { coverSrc } from '../cover';
 import { useProviders, useRoomState } from '../hooks';
 import { useShell } from '../shellContext';
@@ -89,14 +91,13 @@ export function NowPlayingPanel() {
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-xl font-bold text-paper">{current.title}</h2>
               <p className="truncate text-[14px]">
-                {current.artist.trim() ? (
-                  <Link
-                    to={`/artist/${encodeURIComponent(current.artist)}`}
-                    className="text-muted transition-colors hover:text-paper hover:underline"
-                  >
-                    {current.artist}
-                  </Link>
-                ) : null}
+                <ArtistLinks
+                  artist={current.artist}
+                  contributors={current.contributors}
+                  trackRef={current.track_ref}
+                  className="text-muted"
+                  linkClassName="transition-colors hover:text-paper"
+                />
               </p>
             </div>
             {current.source_url?.startsWith('http') && (
@@ -169,20 +170,13 @@ export function NowPlayingPanel() {
             </section>
           )}
 
-          <section className="mt-6 rounded-md bg-panel-2 p-4">
-            <h3 className="text-[13px] font-semibold text-paper">{t('np.aboutArtist')}</h3>
-            <p className="mt-4 truncate text-base font-bold">
-              {current.artist.trim() ? (
-                <Link
-                  to={`/artist/${encodeURIComponent(current.artist)}`}
-                  className="text-paper transition-colors hover:text-muted hover:underline"
-                >
-                  {current.artist}
-                </Link>
-              ) : null}
-            </p>
-            <p className="mt-2 text-[13px] leading-5 text-muted">{t('np.artistPlaceholder')}</p>
-          </section>
+          {current.artist.trim() ? (
+            <ArtistSpotlight
+              artist={current.artist}
+              contributors={current.contributors}
+              trackRef={current.track_ref}
+            />
+          ) : null}
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 place-items-center px-6 pb-16 text-center">
@@ -190,5 +184,91 @@ export function NowPlayingPanel() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 关于艺人卡（参照 Spotify About the artist）：上半部头像横幅 +「关于艺人」叠加层，
+ * 下半部艺人名链接 + bio 摘要。多艺人字符串（「A/B/C」）先拆分，按序解析，
+ * 第一个解出 provider 实体的艺人上卡——整串直接解析大概率撞不到实体，
+ * 是头像/详情经常缺失的根因。解析全灭时回退纯色卡 + 首艺人链接（带 track 锚定）。
+ */
+function ArtistSpotlight(props: {
+  artist: string;
+  contributors?: Contributor[];
+  trackRef: string;
+}): JSX.Element | null {
+  const { artist, contributors, trackRef } = props;
+  const { t } = useTranslation();
+  const [profile, setProfile] = useState<{
+    name: string;
+    avatarUrl?: string;
+    bio?: string;
+    link: string;
+  } | null>(null);
+
+  useEffect(() => {
+    let dead = false;
+    setProfile(null);
+    const names = splitArtistNames(artist, contributors);
+    void (async () => {
+      for (const name of names) {
+        try {
+          const result = await api.artistProfile(name, trackRef);
+          if (dead) return;
+          if (result.provider && result.entity_id) {
+            setProfile({
+              name,
+              avatarUrl: result.avatar_url,
+              bio: result.bio,
+              link: `/artist/${encodeURIComponent(name)}?provider=${encodeURIComponent(result.provider)}&entity=${encodeURIComponent(result.entity_id)}`,
+            });
+            return;
+          }
+        } catch {
+          // 该名解析失败：试下一个
+        }
+      }
+    })();
+    return () => {
+      dead = true;
+    };
+  }, [artist, contributors, trackRef]);
+
+  const name = profile?.name ?? splitArtistNames(artist, contributors)[0] ?? artist;
+  const link = profile?.link ?? artistHref(name, trackRef);
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-md bg-panel-2">
+      <div className="relative">
+        {profile?.avatarUrl ? (
+          <img
+            src={coverSrc(profile.avatarUrl)}
+            alt={t('artistPage.avatarAlt', { name })}
+            className="h-28 w-full object-cover"
+          />
+        ) : (
+          <div className="h-28 w-full bg-panel" />
+        )}
+        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/45 to-transparent" />
+        <h3
+          className="absolute top-2.5 left-3 text-[13px] font-semibold text-paper"
+          style={{ textShadow: '0 1px 8px rgb(0 0 0 / 0.55)' }}
+        >
+          {t('np.aboutArtist')}
+        </h3>
+      </div>
+      <div className="px-4 py-3">
+        <Link
+          to={link}
+          className="block truncate text-base font-bold text-paper transition hover:text-muted hover:underline"
+        >
+          {name}
+        </Link>
+        {profile?.bio && (
+          <p className="mt-1.5 line-clamp-3 text-[12px] leading-5 text-muted">{profile.bio}</p>
+        )}
+      </div>
+    </section>
   );
 }

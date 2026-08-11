@@ -6,12 +6,9 @@
 import { type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Play } from 'lucide-react';
-import { roomStore } from '../app/session';
 import { coverSrc } from './cover';
 import { CoverThumb } from './CoverThumb';
-import { useRoomState } from './hooks';
-import { useToast } from './toast';
-import { useShell } from './shellContext';
+import { useEnqueue } from './TrackList';
 
 export function ActivityCard({
   trackRef,
@@ -26,25 +23,13 @@ export function ActivityCard({
   className?: string;
 }): JSX.Element {
   const { t } = useTranslation();
-  const { setRoomsOpen } = useShell();
-  const { show, showError } = useToast();
-  const state = useRoomState();
+  const enqueue = useEnqueue();
 
   return (
     <button
       type="button"
       title={t('search.add')}
-      onClick={() => {
-        if (!state.roomId) {
-          show(t('home.needRoom'));
-          setRoomsOpen(true);
-          return;
-        }
-        void roomStore
-          .addQueue([trackRef])
-          .then(() => show(t('room.addedToast', { title })))
-          .catch(showError);
-      }}
+      onClick={() => enqueue([trackRef], title)}
       className={`group block rounded-lg p-3 text-left transition-colors hover:bg-panel-2 ${className ?? 'w-full'}`}
     >
       <div className="relative aspect-square w-full rounded-md transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--rail)]">

@@ -167,24 +167,15 @@ export interface HotTrack {
   last_played_at: number;
 }
 
-/** 艺人档案的曲目统计（spec §6.2.4）：cover_url 恒为 /api/v1/cover/{track_ref} 代理路径。 */
-export interface ArtistTrackStat {
-  track_ref: string;
-  title: string;
-  artist: string;
-  play_count: number;
-  last_played_at: number;
-  cover_url?: string;
-}
-
-/** 艺人档案（GET /api/v1/artists/{name}）：本地统计 + 最佳努力富化（失败仅省略 avatar/bio）。 */
+/** 歌手解析结果（GET /api/v1/artists/{name}?track_ref=）：名字键解析到 provider 歌手实体；
+/** 歌手解析结果（GET /api/v1/artists/{name}?track_ref=）：名字键解析到 provider 歌手实体；
+ *  全失败仅 name（无 provider/entity_id/富化），前端据此显示空态。entity_id 供 search/entity 钻取。 */
 export interface ArtistProfile {
   name: string;
-  play_count: number;
-  last_played_at: number;
+  provider?: string;
+  entity_id?: string;
   avatar_url?: string;
   bio?: string;
-  top_tracks: ArtistTrackStat[];
 }
 
 /** 推荐 feed 货架（GET /api/v1/recommendations）：tracks 与 song 搜索元素同构。 */
@@ -201,6 +192,17 @@ export interface RadioSourceCatalogEntry {
   name: string;
   cover_url?: string;
   detail?: string;
+}
+
+/** 聚合电台源目录条目（GET /api/v1/radio/catalog）：spec 为完整源规格（含 provider 前缀与具体 arg），可直接作 radio source。 */
+export interface RadioCatalogEntry {
+  provider: string;
+  spec: string;
+  name: string;
+  cover_url?: string;
+  detail?: string;
+  finite: boolean;
+  requires_credential?: boolean;
 }
 
 /** 歌单元数据 PATCH 输入：任意子集，缺省不变。 */
@@ -243,6 +245,8 @@ export interface PlaylistItem {
   title: string;
   artist: string;
   duration_ms: number;
+  /** 结构化艺人/上传者名单（服务端 2026-08 起解析 contributors_json 下发；旧行缺省） */
+  contributors?: Contributor[];
   added_at: number;
 }
 

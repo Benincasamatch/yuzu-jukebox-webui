@@ -11,8 +11,10 @@ import MobileShell from './ui/MobileShell';
 import HomeView from './ui/HomeView';
 import SearchView from './ui/SearchView';
 import ShelfView from './ui/ShelfView';
+import ChartsView from './ui/ChartsView';
 import PlaylistDetailView from './ui/PlaylistDetailView';
 import ArtistView from './ui/ArtistView';
+import ArtistDiscographyView from './ui/ArtistDiscographyView';
 import SourceCollectionView from './ui/SourceCollectionView';
 import LibraryView from './ui/LibraryView';
 import RoomDeepLink from './ui/RoomDeepLink';
@@ -115,7 +117,9 @@ export default function App() {
               <Route path="/" element={<HomeView />} />
               <Route path="/search" element={<SearchView />} />
               <Route path="/shelf/:kind" element={<ShelfView />} />
+              <Route path="/charts" element={<ChartsView />} />
               <Route path="/playlist/:playlistId" element={<PlaylistDetailView />} />
+              <Route path="/artist/:name/discography" element={<ArtistDiscographyView />} />
               <Route path="/artist/:name" element={<ArtistView />} />
               <Route path="/source/:spec" element={<SourceCollectionView />} />
               <Route path="/library" element={<LibraryView />} />

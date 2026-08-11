@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { Clock3, ChevronLeft, GripVertical, ListMusic, ListPlus, Music2, X } from 'lucide-react';
 import type { PlaylistInfo, SearchTrack } from '../api/types';
 import { api, roomStore } from '../app/session';
+import { ArtistLinks } from './artist';
 import { coverSrc } from './cover';
 import { formatDateTime, formatMs } from './format';
 import { useIdentity, useMediaQuery, useRoomState } from './hooks';
@@ -33,6 +34,18 @@ export type TrackListTrack = Omit<SearchTrack, 'duration_ms'> & {
   added_at?: number;
   ord?: number;
 };
+
+/** SearchTrack → 行模型（艺人页/全部作品页/钻取共用）。 */
+export function searchTrackToRow(track: SearchTrack): TrackListTrack {
+  return {
+    track_ref: track.track_ref,
+    title: track.title,
+    artist: track.artist,
+    duration_ms: track.duration_ms,
+    cover_url: track.cover_url,
+    contributors: track.contributors,
+  };
+}
 
 export interface TrackMenuItem {
   label: string;
@@ -66,6 +79,24 @@ function TrackCover({ track }: { track: { cover_url?: string; track_ref: string 
   );
 }
 
+/**
+ * 双击防护（单击即入队的表面共用）：双击 = click×2，第二击落在双击窗口内
+ * 会对同一 ref 再次入队。对 400ms 窗口内同一 ref 的重击直接吞掉：
+ * 单击零延迟、双击 = 单次入队（与 TrackList 的「再击入队」模型等价）。
+ * 模块级单一手势流：跨表面（首页封面/搜索结果/弹窗行）共享，批量按钮
+ * 以整组 refs 为键，双击「加入全部」同样只入队一次。
+ */
+let lastGestureRef = '';
+let lastGestureAt = 0;
+
+export function swallowRapidReclick(refs: readonly string[], now: number = performance.now()): boolean {
+  const key = refs.join('|');
+  const dup = key === lastGestureRef && now - lastGestureAt < 400;
+  lastGestureRef = key;
+  lastGestureAt = now;
+  return dup;
+}
+
 /** 分块入队（100/批）+ toast + 未入房引导。toastTitle 仅单曲时展示。 */
 export function useEnqueue(): (refs: string[], toastTitle?: string) => void {
   const { t } = useTranslation();
@@ -74,6 +105,7 @@ export function useEnqueue(): (refs: string[], toastTitle?: string) => void {
   const { show, showError } = useToast();
 
   const enqueue = (refs: string[], toastTitle?: string) => {
+    if (swallowRapidReclick(refs)) return;
     if (!state.roomId) {
       show(t('home.needRoom'));
       setRoomsOpen(true);
@@ -796,7 +828,12 @@ export function TrackList({
                       <TrackCover track={track} />
                       <span className="min-w-0">
                         <span className="block truncate text-[14px] text-paper">{track.title}</span>
-                        <span className="block truncate text-[13px] text-muted">{track.artist}</span>
+                        <ArtistLinks
+                          artist={track.artist}
+                          contributors={track.contributors}
+                          trackRef={track.track_ref}
+                          className="block truncate text-[13px] text-muted"
+                        />
                       </span>
                     </span>
                     {showAlbum && (
