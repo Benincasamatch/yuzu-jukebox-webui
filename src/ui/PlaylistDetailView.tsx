@@ -64,11 +64,12 @@ export default function PlaylistDetailView(): JSX.Element {
   const [editMode, setEditMode] = useState(false);
   const [coverFailed, setCoverFailed] = useState(false);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
-  // hero 渐变取色：显示图 no-cors（跨源必污染画布），由隐藏 CORS 探针取色；
-  // 服务端对带 Origin 的封面请求流式回源 + ACAO（见服务端 proxyCover）
+  // hero 渐变取色：显示图 no-cors（跨源必污染画布），由隐藏 CORS 探针取色并本地
+  // 缓存（键 = 歌单 id，稳定）；服务端对带 Origin 的封面请求流式回源 + ACAO
   const headerColor =
     useCoverColor(
       detail?.playlist.cover_url ? coverSrc(detail.playlist.cover_url) : undefined,
+      detail?.playlist.id,
     ) ?? 'var(--panel-2)';
   const canManage = identity?.roles.includes('media_admin') ?? false;
   const canEditMeta = Boolean(

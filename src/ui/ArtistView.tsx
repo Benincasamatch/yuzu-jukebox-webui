@@ -54,11 +54,13 @@ export default function ArtistView(): JSX.Element {
   const [busy, setBusy] = useState(false);
   // 热门曲目默认只展示前 5 首（Spotify Popular 形态），展开后显示全部
   const [tracksExpanded, setTracksExpanded] = useState(false);
-  // hero 取色：显示图 no-cors（跨源必污染画布），由隐藏 CORS 探针取色；
-  // 服务端对带 Origin 的封面请求流式回源 + ACAO（见服务端 proxyCover）
+  // hero 取色：显示图 no-cors（跨源必污染画布），由隐藏 CORS 探针取色并本地缓存；
+  // 键用 provider:entity（免疫上游 CDN 主机轮换导致的 URL 漂移）
   const heroColor =
-    useCoverColor(resolved?.avatarUrl ? coverSrc(resolved.avatarUrl) : undefined) ??
-    'var(--panel-2)';
+    useCoverColor(
+      resolved?.avatarUrl ? coverSrc(resolved.avatarUrl) : undefined,
+      resolved ? `${resolved.provider}:${resolved.entityId}` : undefined,
+    ) ?? 'var(--panel-2)';
 
   useEffect(() => {
     let dead = false;
