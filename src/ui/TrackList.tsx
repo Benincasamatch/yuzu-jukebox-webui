@@ -662,7 +662,8 @@ export function TrackList({
   // 动态列走内联样式——Tailwind 构建期扫描，运行时拼的 grid-cols 类不会生成
   const gridTemplateColumns = [
     ...(onMoveItem ? ['24px'] : []),
-    '28px',
+    // 移动端去序号列（Spotify 移动列表无 # 列）
+    ...(isDesktop ? ['28px'] : []),
     isDesktop ? 'minmax(220px,1fr)' : 'minmax(0,1fr)',
     ...(showAlbum ? ['minmax(140px,0.55fr)'] : []),
     ...(showAddedAt ? ['minmax(130px,0.5fr)'] : []),
@@ -670,7 +671,8 @@ export function TrackList({
     ...(onRemoveItem ? ['28px'] : []),
   ].join(' ');
   const columnCount =
-    2 +
+    1 +
+    (isDesktop ? 1 : 0) +
     (onMoveItem ? 1 : 0) +
     (showAlbum ? 1 : 0) +
     (showAddedAt ? 1 : 0) +
@@ -717,7 +719,7 @@ export function TrackList({
             className="grid items-center gap-4 border-b border-hairline px-4 pb-2 text-[13px] text-muted"
           >
             {onMoveItem && <span aria-hidden="true" />}
-            <span className="text-right">#</span>
+            {isDesktop && <span className="text-right">#</span>}
             <span>{t('trackList.title')}</span>
             {showAlbum && <span>{t('trackList.album')}</span>}
             {showAddedAt && <span>{t('trackList.addedAt')}</span>}
@@ -823,9 +825,11 @@ export function TrackList({
                         <GripVertical className="h-4 w-4" aria-hidden="true" />
                       </button>
                     )}
-                    <span className="text-right text-[13px] text-muted tabular-nums">
-                      {index + 1}
-                    </span>
+                    {isDesktop && (
+                      <span className="text-right text-[13px] text-muted tabular-nums">
+                        {index + 1}
+                      </span>
+                    )}
                     <span className="flex min-w-0 items-center gap-3">
                       <TrackCover track={track} />
                       <span className="min-w-0">

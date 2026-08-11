@@ -80,9 +80,9 @@ export function MobilePlayerBar(): JSX.Element | null {
   const pct = current.duration_ms > 0 ? (pos / current.duration_ms) * 100 : 0;
 
   return (
-    <div className="relative mx-3 mb-2 flex h-14 items-center gap-3 rounded-lg bg-panel-2 px-3.5 shadow-lg">
-      {/* 顶部 2px 进度细线（随卡圆角裁切） */}
-      <div className="absolute inset-x-3 top-0 h-[2px] bg-[var(--rail)]">
+    <div className="relative mx-3 mb-2 flex h-14 items-center gap-3 overflow-hidden rounded-lg bg-panel-2 px-3.5 shadow-lg">
+      {/* 底部 2px 进度细线（贯通整宽贴下缘，overflow-hidden 裁进圆角） */}
+      <div className="absolute inset-x-0 bottom-0 h-[2px] bg-[var(--rail)]">
         <div className="progress-glide h-full bg-accent" style={{ width: `${pct}%` }} />
       </div>
 

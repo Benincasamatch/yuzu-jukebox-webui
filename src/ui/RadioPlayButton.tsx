@@ -96,11 +96,15 @@ export function RadioPlayButton({
         type="button"
         disabled={busy}
         onClick={open}
-        className={`inline-flex items-center gap-1.5 rounded-full border border-hairline px-3.5 py-1.5 text-[13px] font-medium text-muted transition hover:border-accent hover:text-paper disabled:opacity-40 ${className ?? ''}`}
+        aria-label={t('radio.playAsRadio')}
+        title={t('radio.playAsRadio')}
+        className={`inline-flex items-center gap-1.5 rounded-full border border-hairline px-3.5 py-1.5 text-[13px] font-medium text-muted transition hover:border-accent hover:text-paper disabled:opacity-40 max-md:h-12 max-md:w-12 max-md:justify-center max-md:border-transparent max-md:p-0 max-md:hover:bg-[var(--hover)] ${className ?? ''}`}
       >
-        <Radio className="h-4 w-4" aria-hidden="true" />
-        {busy ? t('roomAdmin.radioStarting') : t('radio.playAsRadio')}
-        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+        <Radio className="h-4 w-4 max-md:h-6 max-md:w-6" aria-hidden="true" />
+        <span className="max-md:hidden">
+          {busy ? t('roomAdmin.radioStarting') : t('radio.playAsRadio')}
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 max-md:hidden" aria-hidden="true" />
       </button>
 
       {menu &&
