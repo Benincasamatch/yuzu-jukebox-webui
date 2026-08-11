@@ -186,7 +186,8 @@ input.search-input:focus-visible {
 .miniplayer-enter {
   animation: yuzu-fullscreen-in 250ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
-/* 移动端 封面↔歌词 切换：双视图常驻交叉淡化。enter/leave 两向 keyframe + forwards
+/* 全屏播放器移动端 封面↔歌词 切换：双视图常驻交叉淡化（fs- 前缀避免与页面入场
+   .view-enter 冲突）。enter/leave 两向 keyframe + forwards
    钉端态：无动画释放闪烁，也无条件卸载的暗帧；leave 带静态 opacity:0 兜底
    （prefers-reduced-motion 下 animation 被禁时仍隐藏） */
 @keyframes yuzu-view-in {
@@ -197,28 +198,17 @@ input.search-input:focus-visible {
   from { opacity: 1; }
   to { opacity: 0; }
 }
-.view-enter {
+.fs-view-enter {
   animation: yuzu-view-in 240ms ease forwards;
 }
-.view-leave {
+.fs-view-leave {
   animation: yuzu-view-out 240ms ease forwards;
   opacity: 0;
   pointer-events: none;
 }
-.view-hidden {
+.fs-view-hidden {
   opacity: 0;
   pointer-events: none;
-}
-
-/* ---------- 全屏舞台动效（prefers-reduced-motion 下全部被下方规则关闭） ---------- */
-/* 极光团漂移：两团反向错相位，制造缓慢呼吸的环境光 */
-@keyframes stage-drift-a {
-  from { transform: translate3d(-6%, -4%, 0) scale(1); }
-  to { transform: translate3d(7%, 6%, 0) scale(1.15); }
-}
-@keyframes stage-drift-b {
-  from { transform: translate3d(5%, 7%, 0) scale(1.1); }
-  to { transform: translate3d(-7%, -5%, 0) scale(0.95); }
 }
 
 /* ---------- 复选框风格化 ---------- */

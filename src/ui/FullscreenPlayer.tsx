@@ -1,6 +1,6 @@
 /**
- * 全屏沉浸舞台：浏览器即画布。静态背景（深压虚化封面底 + 双极光团
- * 漂移 + 均一暗纱 + 暗角）由封面取色驱动；桌面端封面静止陈列，
+ * 全屏沉浸舞台：浏览器即画布。静态背景（深压虚化封面底 + 双极光团 +
+ * 均一暗纱 + 暗角）由封面取色驱动；桌面端封面静止陈列，
  * chrome（关闭/点播者/时间）在活动后 2.8s 自动隐去（连同光标），底部通栏
  * 发丝进度线贯穿视口。播放位置永远由服务端五元组推算，无任何本地进度状态。
  * 纯观赏视图：桌面端无任何控制按钮（控制在 PlayerBar），歌词手动滚动
@@ -70,7 +70,18 @@ export function FullscreenPlayer(props: {
       if (e.key === 'Escape') closePlayer();
     };
     document.addEventListener('keydown', onKey);
+    // 全屏期间锁死背景滚动：body/html 之外，外壳的滚动容器是 <main>（overflow-y-auto），
+    // 只锁 body 挡不住触摸链；逐个锁 main 并在清理时恢复
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    const scrollLocks: HTMLElement[] = [];
+    for (const m of document.querySelectorAll<HTMLElement>('main')) {
+      const cs = getComputedStyle(m);
+      if (cs.overflowY === 'auto' || cs.overflowY === 'scroll') {
+        m.style.overflow = 'hidden';
+        scrollLocks.push(m);
+      }
+    }
     pushOverlayCloser('fullscreen-player', closePlayer);
     wake();
     const idle = idleTimerRef.current;
@@ -79,6 +90,8 @@ export function FullscreenPlayer(props: {
       if (idle !== null) window.clearTimeout(idle);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      for (const m of scrollLocks) m.style.overflow = '';
       removeOverlayCloser('fullscreen-player');
     };
   }, [closePlayer, onClose, wake]);
@@ -138,7 +151,6 @@ export function FullscreenPlayer(props: {
           background: `radial-gradient(52% 58% at 28% 38%, ${glow?.[0] ?? '#3A4A2E'} 0%, transparent 72%)`,
           opacity: 'calc(var(--glow-opacity) * 0.55)',
           filter: 'blur(90px)',
-          animation: 'stage-drift-a 26s ease-in-out infinite alternate',
           transition: 'background 600ms ease',
         }}
       />
@@ -149,7 +161,6 @@ export function FullscreenPlayer(props: {
           background: `radial-gradient(48% 54% at 74% 66%, ${glow?.[1] ?? '#2E4258'} 0%, transparent 72%)`,
           opacity: 'calc(var(--glow-opacity) * 0.45)',
           filter: 'blur(100px)',
-          animation: 'stage-drift-b 34s ease-in-out infinite alternate',
           transition: 'background 600ms ease',
         }}
       />
@@ -188,17 +199,19 @@ export function FullscreenPlayer(props: {
     </button>
   );
 
-  // portal 到 body：任何祖先的 transform/filter/动画都不能影响 fixed 覆盖定位
+  // portal 到 body：任何祖先的 transform/filter/动画都不能影响 fixed 覆盖定位。
+  // 外层保持无 transform + overflow-hidden：进场动画若留在外层，fill forwards 会
+  // 永久保留 transform，使辉光等 fixed 子层变成相对外层定位并计入滚动溢出区
+  // （26s/34s 漂移 scale 撑出四面滚动区，玩家看似缓慢向右下伸展）。动画移到内层。
   return createPortal(
     <div
-      className={`fullscreen-enter fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-hall ${
-        chromeVisible ? '' : 'cursor-none'
-      } ${
-        closing ? 'fullscreen-exit' : ''
-      }`}
+      className={`fixed inset-0 z-50 overflow-hidden ${chromeVisible ? '' : 'cursor-none'}`}
       onPointerMove={wake}
     >
-      {backdrop}
+      {/* bg-hall 挂内层：外层无背景，整体（背景+内容）随动画一起下进下出，
+          而不是背景先覆盖、内容再滑入 */}
+      <div className={`h-full w-full bg-hall ${closing ? 'fullscreen-exit' : 'fullscreen-enter'}`}>
+        {backdrop}
 
       <button
         onClick={closePlayer}
@@ -224,7 +237,7 @@ export function FullscreenPlayer(props: {
             }
           }}
           className={`absolute inset-0 flex flex-col text-center landscape:flex-row landscape:items-center landscape:gap-8 ${
-            view === 'cover' ? 'view-enter' : 'view-leave'
+            view === 'cover' ? 'fs-view-enter' : 'fs-view-leave'
           }`}
         >
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
@@ -289,7 +302,7 @@ export function FullscreenPlayer(props: {
             }
           }}
           className={`absolute inset-0 overflow-hidden ${
-            view === 'lyrics' ? 'view-enter' : everSwitched ? 'view-leave' : 'view-hidden'
+            view === 'lyrics' ? 'fs-view-enter' : everSwitched ? 'fs-view-leave' : 'fs-view-hidden'
           }`}
         >
           <div className="h-full px-2 py-12">{lyricsBlock('center')}</div>
@@ -345,6 +358,7 @@ export function FullscreenPlayer(props: {
         <div className="h-[2px] w-full bg-white/10">
           <div className="progress-glide h-full bg-white/70" style={{ width: `${pct}%` }} />
         </div>
+      </div>
       </div>
     </div>,
     document.body,
