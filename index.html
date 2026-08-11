@@ -7,13 +7,12 @@
   <script src="config.js"></script>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <script>
-    // 首帧前落 scheme，避免刷白/刷黑：本机锁定 > config.js 指定 > 跟随系统
+    // 首帧前落 scheme，避免刷白/刷黑：本机锁定 > config.js 指定 > 内置默认深色
     (function () {
       try {
         var saved = localStorage.getItem('yuzu-scheme');
         var cfg = (globalThis.YUZU_CONFIG && YUZU_CONFIG.scheme) || '';
-        var sysDark = matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.dataset.scheme = saved || cfg || (sysDark ? 'dark' : 'light');
+        document.documentElement.dataset.scheme = saved || cfg || 'dark';
       } catch (_) {
         document.documentElement.dataset.scheme = 'dark';
       }

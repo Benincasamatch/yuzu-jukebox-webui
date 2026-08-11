@@ -64,7 +64,7 @@ export const faviconUrl: string = runtime.favicon || 'favicon.svg';
 /** 默认主题色（用户本机选择优先于它）。 */
 export const defaultAccent: string = runtime.accent || '#1DB954';
 
-/** 配置指定的默认深浅色；'' = 跟随系统（用户本机锁定优先）。 */
+/** 配置指定的默认深浅色；'' = 内置默认深色（用户本机锁定优先；不跟随系统）。 */
 export const configuredScheme: 'dark' | 'light' | '' = runtime.scheme ?? '';
 
 /**
