@@ -231,9 +231,12 @@ PlaylistInfo.pinned、歌单条目 contributors 结构化下发。
 `<img>`（no-cors，省带宽）；带 Origin 的 CORS 消费者（crossOrigin img / fetch）
 直接流式回源 + ACAO——重定向目标（源站 CDN）不保证 ACAO 且常是 http 链接，
 canvas 读像素必失败。已知 CDN 主机的 http 链接在出口统一升级 https
-（music.126.net / y.gtimg.cn）。前端配套：hero 封面（艺人头像/歌单封面）显示图
-no-cors + 隐藏 CORS 探针取色（`ui/useCoverColor.ts`），每页多一次缩略图请求，
-浏览器按 CORS 分区缓存。
+（music.126.net / y.gtimg.cn）。封面流式响应一律 `Cache-Control: private`
+（边缘 CDN 不守 `Vary: Origin`，曾把 Web origin 的 ACAO 变体错发给 Capacitor
+的 https://localhost，取色探针 MissingAllowOriginHeader；private 让共享缓存
+禁存、浏览器 CORS 分区缓存仍按月复用）。前端配套：hero 封面（艺人头像/歌单
+封面）显示图 no-cors + 隐藏 CORS 探针取色（`ui/useCoverColor.ts`），每页多
+一次缩略图请求。
 IdP 侧待办：新增 PKCE(User-Agent)应用 → 其 client_id 加入服务端
 `oidc.extra_client_ids`；roles 进 ID token 用 Application 级 Token Settings
 或 scope `urn:zitadel:iam:org:projects:roles`（WebUI 授权请求已自动携带后者）。
