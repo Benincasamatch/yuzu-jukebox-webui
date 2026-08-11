@@ -178,14 +178,6 @@ export interface ArtistProfile {
   bio?: string;
 }
 
-/** 推荐 feed 货架（GET /api/v1/recommendations）：tracks 与 song 搜索元素同构。 */
-export interface RecommendationShelf {
-  /** provider 作用域稳定键（如 toplist:<id>），作 React key */
-  id: string;
-  title: string;
-  tracks: SearchTrack[];
-}
-
 /** 动态电台源目录条目（GET /api/v1/providers/{id}/radio-catalog）：spec 不含 provider 前缀。 */
 export interface RadioSourceCatalogEntry {
   spec: string;

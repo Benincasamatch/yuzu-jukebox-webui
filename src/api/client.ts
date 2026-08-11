@@ -50,7 +50,6 @@ import type {
   QrLoginStartResult,
   RadioSourceCatalogEntry,
   RadioCatalogEntry,
-  RecommendationShelf,
   RoomAccessCode,
   RoomCapabilities,
   RoomControllerGrant,
@@ -572,14 +571,6 @@ export class ApiClient {
       `/api/v1/artists/${encodeURIComponent(name)}${query}`,
     );
     return result.artist;
-  }
-
-  /** 推荐 feed（spec §6.2.4）：空源返回空数组（200，不是 null）。 */
-  async recommendations(): Promise<RecommendationShelf[]> {
-    const result = await this.#json<{ shelves: RecommendationShelf[] | null }>(
-      '/api/v1/recommendations',
-    );
-    return asList(result.shelves);
   }
 
   /** 动态电台源目录（spec §6.2.4）：501 = provider 未实现目录能力，调用方按无目录处理。 */

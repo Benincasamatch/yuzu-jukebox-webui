@@ -659,9 +659,6 @@ export const zhCN = {
     playedAt: '{{time}} 播放',
     needRoom: '先进入一个房间',
     radioNeedControl: '这个房间的电台由控制者开启',
-    recommendationsLoading: '正在为你挑选…',
-    addShelf: '全部加入队列',
-    addTrack: '将「{{title}}」加入队列',
   },
   shelf: {
     empty: '这里还什么都没有',

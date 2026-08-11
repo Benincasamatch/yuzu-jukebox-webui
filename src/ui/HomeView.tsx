@@ -1,29 +1,23 @@
 /**
- * 首页 = 漫游区：推荐 feed、源目录驱动的电台与集合、全局热门、最近播放和本房热门。
+ * 首页 = 漫游区：榜单（聚合电台目录）、源目录驱动的电台与集合、全局热门、最近播放和本房热门。
  * 封面 shelf 一律单行横向滚动、只摆第一分页；「显示全部」跳 /shelf/:kind 全览页。
  */
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Play } from 'lucide-react';
 import type {
   HistoryEntry,
   HotTrack,
   RadioCatalogEntry,
-  RecommendationShelf,
-  SearchTrack,
   StatsEntry,
 } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { ActivityCard } from './ActivityCard';
 import { ChartCard } from './ChartCard';
-import { coverSrc } from './cover';
-import { CoverThumb } from './CoverThumb';
 import { formatClock } from './format';
 import { useIdentity, useProviders, useRoomState } from './hooks';
 import { SOURCE_DESC_KEYS } from './radioSources';
 import { useToast } from './toast';
-import { useEnqueue } from './TrackList';
 import { useShell } from './AppShell';
 
 export default function HomeView(): JSX.Element {
@@ -36,7 +30,6 @@ export default function HomeView(): JSX.Element {
         {t('lobby.greeting', { period: t(greetingKey()), name: identity?.name ?? '' })}
       </h1>
 
-      <RecommendationSection />
       <ChartsSection />
       <RadioSection />
       <HotSection />
@@ -91,95 +84,6 @@ const collectionCardClass =
 function ShelfRow({ children }: { children: ReactNode }): JSX.Element {
   return (
     <div className="no-scrollbar -mx-2 flex gap-2 overflow-x-auto px-2 pb-1">{children}</div>
-  );
-}
-
-// ---------- 为你推荐（服务端推荐 feed） ----------
-
-function RecommendationSection(): JSX.Element | null {
-  const { t } = useTranslation();
-  const { showError } = useToast();
-  const enqueue = useEnqueue();
-  const [shelves, setShelves] = useState<RecommendationShelf[] | null>(null);
-
-  useEffect(() => {
-    let dead = false;
-    api
-      .recommendations()
-      .then((result) => {
-        if (!dead) setShelves(result);
-      })
-      .catch((error: unknown) => {
-        if (dead) return;
-        setShelves([]);
-        showError(error);
-      });
-    return () => {
-      dead = true;
-    };
-  }, [showError]);
-
-  if (shelves === null) {
-    return <p className="mt-10 text-sm text-muted">{t('home.recommendationsLoading')}</p>;
-  }
-
-  const populatedShelves = shelves.filter((shelf) => shelf.tracks.length > 0);
-  if (populatedShelves.length === 0) return null;
-
-  return (
-    <>
-      {populatedShelves.map((shelf) => (
-        <section key={shelf.id} className="mt-10">
-          <ShelfHeader
-            title={shelf.title}
-            actionLabel={t('home.addShelf')}
-            onAction={() => enqueue(shelf.tracks.map((track) => track.track_ref))}
-          />
-          <ShelfRow>
-            {shelf.tracks.map((track) => (
-              <RecommendationCard key={track.track_ref} track={track} onEnqueue={enqueue} />
-            ))}
-          </ShelfRow>
-        </section>
-      ))}
-    </>
-  );
-}
-
-function RecommendationCard({
-  track,
-  onEnqueue,
-}: {
-  track: SearchTrack;
-  onEnqueue: (refs: string[], toastTitle?: string) => void;
-}): JSX.Element {
-  const { t } = useTranslation();
-
-  return (
-    <button
-      type="button"
-      title={t('home.addTrack', { title: track.title })}
-      onClick={() => onEnqueue([track.track_ref], track.title)}
-      className="group block w-[180px] flex-none rounded-lg p-3 text-left transition-colors hover:bg-panel-2"
-    >
-      <div className="relative aspect-square w-full rounded-md transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--rail)]">
-        <CoverThumb
-          src={coverSrc(
-            track.cover_url || `/api/v1/cover/${encodeURIComponent(track.track_ref)}`,
-          )}
-          alt={track.title}
-          className="h-full w-full rounded-md"
-        />
-        <span
-          aria-hidden="true"
-          className="absolute right-2 bottom-2 grid h-12 w-12 translate-y-2 place-items-center rounded-full bg-accent text-on-accent opacity-0 shadow-lg transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100"
-        >
-          <Play className="h-5 w-5 fill-current" />
-        </span>
-      </div>
-      <div className="mt-3 truncate text-[15px] font-semibold text-paper">{track.title}</div>
-      <div className="mt-1 line-clamp-2 text-[13px] text-muted">{track.artist}</div>
-    </button>
   );
 }
 
