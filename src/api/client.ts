@@ -564,11 +564,23 @@ export class ApiClient {
     return asList(result.providers);
   }
 
-  /** 歌手解析（spec §6.2.4）：名字键解析到 provider 歌手实体；trackRef 可选（NowPlaying 播放曲目锚定，优先用其 provider 解析）。 */
-  async artistProfile(name: string, trackRef?: string): Promise<ArtistProfile> {
-    const query = trackRef ? `?track_ref=${encodeURIComponent(trackRef)}` : '';
+  /** 歌手解析（spec §6.2.4）：名字键解析到 provider 歌手实体。定位精度递减：
+   *  provider+entityId 直达（搜索艺人卡/known entity，零搜索）> trackRef 锚定
+   *  （播放曲目 contributors 实体键）> 纯名字搜索。 */
+  async artistProfile(
+    name: string,
+    opts: { trackRef?: string; provider?: string; entityId?: string } = {},
+  ): Promise<ArtistProfile> {
+    const query = new URLSearchParams();
+    if (opts.provider && opts.entityId) {
+      query.set('provider', opts.provider);
+      query.set('entity_id', opts.entityId);
+    } else if (opts.trackRef) {
+      query.set('track_ref', opts.trackRef);
+    }
+    const suffix = query.size > 0 ? `?${query.toString()}` : '';
     const result = await this.#json<{ artist: ArtistProfile }>(
-      `/api/v1/artists/${encodeURIComponent(name)}${query}`,
+      `/api/v1/artists/${encodeURIComponent(name)}${suffix}`,
     );
     return result.artist;
   }

@@ -18,7 +18,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Disc3, Play, User } from 'lucide-react';
 import type { SearchEntity, SearchTrack } from '../api/types';
 import { api } from '../app/session';
-import { coverSrc } from './cover';
+import { coverSrc, originalCoverSrc } from './cover';
 import { TrackList, searchTrackToRow, useEnqueue } from './TrackList';
 import { useProviders } from './hooks';
 import { useToast } from './toast';
@@ -57,11 +57,11 @@ export default function ArtistView(): JSX.Element {
   useEffect(() => {
     let dead = false;
     if (providerOverride && entityOverride) {
-      // 搜索艺人卡直达：内容零解析；仍按名字补一次解析拿头像/bio，
-      // 仅当解到同一实体时才采用（防同名艺人张冠李戴）
+      // 搜索艺人卡直达：内容零解析；头像/bio 走 provider+entity 直达解析
+      // （服务端 ArtistIDDetailer 按实体键取，零搜索）；仅同实体才采用
       setResolved({ provider: providerOverride, entityId: entityOverride });
       api
-        .artistProfile(name)
+        .artistProfile(name, { provider: providerOverride, entityId: entityOverride })
         .then((profile) => {
           if (dead) return;
           if (profile.provider === providerOverride && profile.entity_id === entityOverride) {
@@ -81,7 +81,7 @@ export default function ArtistView(): JSX.Element {
     setResolving(true);
     setResolved(null);
     api
-      .artistProfile(name, trackRef)
+      .artistProfile(name, { trackRef })
       .then((profile) => {
         if (dead) return;
         if (profile.provider && profile.entity_id) {
@@ -161,11 +161,13 @@ export default function ArtistView(): JSX.Element {
 
   return (
     <div className="view-enter pb-10">
-      {/* 通栏横幅：头像作背景（object-cover 裁切，焦点偏上保人脸），渐变压暗汇入面板底色 */}
-      <header className="relative flex min-h-[240px] flex-col justify-end overflow-hidden md:min-h-[320px]">
+      {/* 通栏横幅：头像作背景（object-cover 裁切，焦点偏上保人脸），渐变压暗汇入面板底色。
+          高度锚定视口 ~40%（hero:内容 ≈ 4:6），下保障碍下限/上限。
+          大幅面必须原图：默认封面端点回源 300px 缩略，全宽横幅会糊 */}
+      <header className="relative flex h-[38vh] min-h-[300px] max-h-[520px] flex-col justify-end overflow-hidden">
         {resolved?.avatarUrl ? (
           <img
-            src={coverSrc(resolved.avatarUrl)}
+            src={originalCoverSrc(resolved.avatarUrl)}
             alt=""
             className="absolute inset-0 h-full w-full object-cover object-[center_22%]"
           />

@@ -214,14 +214,14 @@ function ArtistSpotlight(props: {
     void (async () => {
       for (const name of names) {
         try {
-          const result = await api.artistProfile(name, trackRef);
+          const result = await api.artistProfile(name, { trackRef });
           if (dead) return;
           if (result.provider && result.entity_id) {
             setProfile({
               name,
               avatarUrl: result.avatar_url,
               bio: result.bio,
-              link: `/artist/${encodeURIComponent(name)}?provider=${encodeURIComponent(result.provider)}&entity=${encodeURIComponent(result.entity_id)}`,
+              link: artistHref(name, { provider: result.provider, entityId: result.entity_id }),
             });
             return;
           }
@@ -236,7 +236,7 @@ function ArtistSpotlight(props: {
   }, [artist, contributors, trackRef]);
 
   const name = profile?.name ?? splitArtistNames(artist, contributors)[0] ?? artist;
-  const link = profile?.link ?? artistHref(name, trackRef);
+  const link = profile?.link ?? artistHref(name, { trackRef });
 
   return (
     <section className="mt-6 overflow-hidden rounded-md bg-panel-2">
@@ -245,10 +245,10 @@ function ArtistSpotlight(props: {
           <img
             src={coverSrc(profile.avatarUrl)}
             alt={t('artistPage.avatarAlt', { name })}
-            className="h-28 w-full object-cover"
+            className="aspect-[4/3] w-full object-cover"
           />
         ) : (
-          <div className="h-28 w-full bg-panel" />
+          <div className="aspect-[4/3] w-full bg-panel" />
         )}
         <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/45 to-transparent" />
         <h3

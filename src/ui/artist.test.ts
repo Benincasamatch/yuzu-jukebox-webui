@@ -63,16 +63,16 @@ describe('tokenizeArtists', () => {
     ]);
   });
 
-  it('anchors contributor names inside the display string', () => {
+  it('anchors contributor names inside the display string and carries entity ids', () => {
     expect(
       tokenizeArtists('AC/DC feat. 张三', [
-        { role: 'artist', name: 'AC/DC' },
+        { role: 'artist', name: 'AC/DC', entity_id: '111' },
         { role: 'artist', name: '张三' },
       ]),
     ).toEqual([
-      { text: 'AC/DC', name: 'AC/DC' },
+      { text: 'AC/DC', name: 'AC/DC', entityId: '111' },
       { text: ' feat. ' },
-      { text: '张三', name: '张三' },
+      { text: '张三', name: '张三', entityId: undefined },
     ]);
   });
 
@@ -87,8 +87,14 @@ describe('tokenizeArtists', () => {
 
 describe('artistHref', () => {
   it('encodes the name and carries the track anchor', () => {
-    expect(artistHref('塞壬唱片-MSR/张晶', 'ncm:1')).toBe(
+    expect(artistHref('塞壬唱片-MSR/张晶', { trackRef: 'ncm:1' })).toBe(
       `/artist/${encodeURIComponent('塞壬唱片-MSR/张晶')}?track=ncm%3A1`,
+    );
+  });
+
+  it('prefers provider+entity direct links over the track anchor', () => {
+    expect(artistHref('Chevy', { provider: 'ncm', entityId: '47992679', trackRef: 'ncm:1' })).toBe(
+      '/artist/Chevy?provider=ncm&entity=47992679',
     );
   });
 

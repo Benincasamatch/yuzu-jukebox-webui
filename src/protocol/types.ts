@@ -33,6 +33,8 @@ export interface Identity {
 export interface Contributor {
   role: string;
   name: string;
+  /** provider 原生艺人/上传者实体键（服务端 2026-08 起随曲目下发；可直达 /artists 解析，免名字搜索） */
+  entity_id?: string;
 }
 
 /** 曲目层元数据（入队快照，队列与播放广播都带；字段可空即降级，spec §4.1） */
