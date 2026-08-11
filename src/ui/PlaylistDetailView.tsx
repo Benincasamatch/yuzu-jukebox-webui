@@ -366,6 +366,9 @@ export default function PlaylistDetailView(): JSX.Element {
             <img
               src={coverSrc(detail.playlist.cover_url)}
               alt={t('playlist.coverAlt', { name: detail.playlist.name })}
+              // 跨域部署（Capacitor origin = https://localhost）下 canvas 取色
+              // 需 CORS 模式加载，否则画布被污染、渐变色取不到
+              crossOrigin="anonymous"
               onLoad={handleCoverLoad}
               onError={() => {
                 setCoverFailed(true);
