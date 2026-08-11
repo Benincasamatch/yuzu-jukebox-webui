@@ -217,7 +217,8 @@ export default function ArtistView(): JSX.Element {
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(to bottom, color-mix(in srgb, ${heroColor} 45%, rgb(0 0 0 / 0.55)), rgb(0 0 0 / 0.05) 45%, var(--panel))`,
+            background:
+              'linear-gradient(to bottom, rgb(0 0 0 / 0.30), rgb(0 0 0 / 0.05) 45%, var(--panel))',
           }}
         />
         <div className="relative px-4 pb-5 md:px-8 md:pb-7">
