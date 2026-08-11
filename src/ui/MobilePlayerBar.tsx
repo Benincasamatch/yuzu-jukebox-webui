@@ -29,7 +29,7 @@ function positionOf(playback: {
   return Math.max(0, Math.min(shouldBe, current.duration_ms));
 }
 
-export function MobilePlayerBar(): JSX.Element {
+export function MobilePlayerBar(): JSX.Element | null {
   const { t } = useTranslation();
   const state = useRoomState();
   const { nameOf, queueOpen, setQueueOpen, setRoomsOpen } = useShell();
@@ -58,7 +58,7 @@ export function MobilePlayerBar(): JSX.Element {
   // 未入房：降级为「选择房间」条（点击开房间弹层）
   if (!state.roomId) {
     return (
-      <div className="flex h-14 flex-none items-center justify-between gap-3 border-t border-hairline bg-panel px-3.5">
+      <div className="mx-3 mb-2 flex h-14 items-center justify-between gap-3 rounded-lg bg-panel-2 px-3.5 shadow-lg">
         <span className="truncate text-[12.5px] text-faint">{t('shell.noRoomHint')}</span>
         <button
           type="button"
@@ -71,29 +71,18 @@ export function MobilePlayerBar(): JSX.Element {
     );
   }
 
+  // 入房但无播放内容：不渲染播放条（底部只剩 TabBar，界面不被空控件占位）
   if (!current) {
-    return (
-      <div className="flex h-14 flex-none items-center justify-between gap-3 border-t border-hairline bg-panel px-3.5">
-        <span className="truncate text-[12.5px] text-faint">{t('shell.idleHint')}</span>
-        <button
-          type="button"
-          data-queue-toggle
-          onClick={() => setQueueOpen(true)}
-          className="relative grid h-8 w-8 flex-none place-items-center rounded-full text-muted after:absolute after:-inset-1 after:content-[''] hover:bg-[var(--hover)]"
-        >
-          <ListMusic className="h-4 w-4" />
-        </button>
-      </div>
-    );
+    return null;
   }
 
   const pos = personalPaused ? audio.currentTime * 1_000 : positionOf(playback);
   const pct = current.duration_ms > 0 ? (pos / current.duration_ms) * 100 : 0;
 
   return (
-    <div className="relative flex h-14 flex-none items-center gap-3 border-t border-hairline bg-panel px-3.5">
-      {/* 顶部 2px 进度细线 */}
-      <div className="absolute inset-x-0 top-0 h-[2px] bg-[var(--rail)]">
+    <div className="relative mx-3 mb-2 flex h-14 items-center gap-3 rounded-lg bg-panel-2 px-3.5 shadow-lg">
+      {/* 顶部 2px 进度细线（随卡圆角裁切） */}
+      <div className="absolute inset-x-3 top-0 h-[2px] bg-[var(--rail)]">
         <div className="progress-glide h-full bg-accent" style={{ width: `${pct}%` }} />
       </div>
 

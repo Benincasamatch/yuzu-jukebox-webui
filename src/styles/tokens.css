@@ -35,7 +35,7 @@
 @media (width < 48rem) {
   :root {
     --header-h: calc(3.3125rem + env(safe-area-inset-top)); /* 移动顶栏 53px 实测 + 刘海 */
-    --chrome-b: calc(6.9875rem + env(safe-area-inset-bottom)); /* 播放条 56 + TabBar 55.8 实测 */
+    --chrome-b: calc(7.5rem + env(safe-area-inset-bottom)); /* 悬浮播放条 56 + 间距 8 + TabBar 55.8 实测 */
   }
 }
 
