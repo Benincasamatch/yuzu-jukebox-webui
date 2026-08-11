@@ -13,7 +13,6 @@ import type {
 } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { ActivityCard } from './ActivityCard';
-import { ChartCard } from './ChartCard';
 import { formatClock } from './format';
 import { useIdentity, useProviders, useRoomState } from './hooks';
 import { SOURCE_DESC_KEYS } from './radioSources';
@@ -135,16 +134,28 @@ function ChartsSection(): JSX.Element | null {
         onAction={hasMore ? () => navigate('/charts') : undefined}
       />
       <ShelfRow>
-        {shown.map((entry) => (
-          <ChartCard
-            key={entry.spec}
-            entry={entry}
-            credentialOk={
-              (providers?.find((p) => p.id === entry.provider)?.credential_status ?? 'none') === 'ok'
-            }
-            className="w-[180px] flex-none"
-          />
-        ))}
+        {shown.map((entry) => {
+          const credentialOk =
+            (providers?.find((p) => p.id === entry.provider)?.credential_status ?? 'none') ===
+            'ok';
+          const usable = !entry.requires_credential || credentialOk;
+          // 纯文字卡（与随便听听同形态）：标题 + 来源；封面留给 /charts 全览页
+          return (
+            <button
+              key={entry.spec}
+              type="button"
+              disabled={!usable}
+              title={usable ? undefined : t('radio.credentialNeed')}
+              onClick={() => navigate(`/source/${encodeURIComponent(entry.spec)}`)}
+              className={`${collectionCardClass} w-[180px] flex-none`}
+            >
+              <div className="truncate text-[15px] font-semibold text-paper">{entry.name}</div>
+              <div className="mt-1 text-[13px] text-muted">
+                {t('home.chartFrom', { provider: entry.provider })}
+              </div>
+            </button>
+          );
+        })}
       </ShelfRow>
     </section>
   );

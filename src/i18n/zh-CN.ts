@@ -650,6 +650,7 @@ export const zhCN = {
   home: {
     radioTitle: '随便听听',
     chartsTitle: '榜单',
+    chartFrom: '来自 {{provider}}',
     hotTitle: '热门',
     recentTitle: '最近播放',
     statsTitle: '本房热门',
