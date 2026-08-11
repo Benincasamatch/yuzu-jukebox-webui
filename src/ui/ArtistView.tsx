@@ -12,13 +12,14 @@
  * 注意：useParams 返回的路由参数已被 react-router 解码，不得再 decodeURIComponent
  * （曾对含 % 的艺人名双重解码抛 URIError，整树白屏）。
  */
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { useCallback, useEffect, useState, type JSX, type SyntheticEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Disc3, Play, User } from 'lucide-react';
 import type { SearchEntity, SearchTrack } from '../api/types';
 import { api } from '../app/session';
 import { coverSrc, originalCoverSrc } from './cover';
+import { extractGlowColors } from './glow';
 import { TrackList, searchTrackToRow, useEnqueue } from './TrackList';
 import { useProviders } from './hooks';
 import { useToast } from './toast';
@@ -53,6 +54,12 @@ export default function ArtistView(): JSX.Element {
   const [busy, setBusy] = useState(false);
   // 热门曲目默认只展示前 5 首（Spotify Popular 形态），展开后显示全部
   const [tracksExpanded, setTracksExpanded] = useState(false);
+  // 移动端 hero 渐变取色（头像主色，与歌单页 headerColor 同手法；头像缺失回退面板色）
+  const [heroColor, setHeroColor] = useState('var(--panel-2)');
+
+  const handleAvatarLoad = (event: SyntheticEvent<HTMLImageElement>) => {
+    setHeroColor(extractGlowColors(event.currentTarget)?.[0] ?? 'var(--panel-2)');
+  };
 
   useEffect(() => {
     let dead = false;
@@ -141,6 +148,10 @@ export default function ArtistView(): JSX.Element {
     };
   }, [providerId, entityId, entityAlbums, showError]);
 
+  useEffect(() => {
+    setHeroColor('var(--panel-2)');
+  }, [name]);
+
   const openAlbum = useCallback(
     (album: SearchEntity) => {
       if (!providerId || !entityId || !album.entity_id || busy) return;
@@ -161,10 +172,43 @@ export default function ArtistView(): JSX.Element {
 
   return (
     <div className="view-enter pb-10">
-      {/* 通栏横幅：头像作背景（object-cover 裁切，焦点偏上保人脸），渐变压暗汇入面板底色。
+      {/* 移动端 hero（Spotify 移动艺人页）：头像主色渐变背板 + 居中圆形头像 +
+          大字名左对齐；桌面端保留下方通栏横幅 */}
+      <header
+        className="md:hidden"
+        style={{
+          background: `linear-gradient(to bottom, color-mix(in srgb, ${heroColor} 55%, transparent), transparent)`,
+        }}
+      >
+        <div className="flex flex-col px-4 pt-8 pb-5">
+          {resolved?.avatarUrl ? (
+            <img
+              src={originalCoverSrc(resolved.avatarUrl)}
+              alt=""
+              onLoad={handleAvatarLoad}
+              className="mx-auto h-44 w-44 rounded-full object-cover shadow-2xl"
+            />
+          ) : (
+            <div className="mx-auto grid h-44 w-44 place-items-center rounded-full bg-panel-2 text-faint shadow-2xl">
+              <User className="h-16 w-16" aria-hidden="true" />
+            </div>
+          )}
+          <h1 className="mt-5 text-3xl leading-[1.05] font-extrabold tracking-tight break-words text-paper">
+            {name}
+          </h1>
+          {resolved?.bio && (
+            <p className="mt-1.5 line-clamp-2 text-[13px] text-muted">{resolved.bio}</p>
+          )}
+          {!resolving && !resolved && (
+            <p className="mt-1.5 text-[13px] text-muted">{t('artistPage.noEntity')}</p>
+          )}
+        </div>
+      </header>
+
+      {/* 桌面通栏横幅：头像作背景（object-cover 裁切，焦点偏上保人脸），渐变压暗汇入面板底色。
           高度锚定视口 ~40%（hero:内容 ≈ 4:6），下保障碍下限/上限。
           大幅面必须原图：默认封面端点回源 300px 缩略，全宽横幅会糊 */}
-      <header className="relative flex h-[38vh] min-h-[300px] max-h-[520px] flex-col justify-end overflow-hidden">
+      <header className="relative hidden h-[38vh] min-h-[300px] max-h-[520px] flex-col justify-end overflow-hidden md:flex">
         {resolved?.avatarUrl ? (
           <img
             src={originalCoverSrc(resolved.avatarUrl)}
@@ -219,7 +263,7 @@ export default function ArtistView(): JSX.Element {
         ) : (
           <>
             {providerId && (
-              <div className="mb-6 flex items-center gap-4">
+              <div className="mb-6 flex items-center gap-4 max-md:justify-end">
                 <button
                   type="button"
                   disabled={!tracks || tracks.length === 0}

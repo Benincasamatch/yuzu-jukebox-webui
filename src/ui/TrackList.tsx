@@ -653,15 +653,17 @@ export function TrackList({
     onPointerCancel: (event) => finishDrag(event.pointerId, false),
   });
 
-  const showAlbum = tracks.some((track) => track.album !== undefined);
-  const showAddedAt = tracks.some((track) => track.added_at !== undefined);
+  // 移动端只保留 标题/时长 主列（Spotify 移动列表形态），专辑/添加日期在 md 起恢复
+  const isDesktop = useMediaQuery('(min-width: 768px)');
+  const showAlbum = isDesktop && tracks.some((track) => track.album !== undefined);
+  const showAddedAt = isDesktop && tracks.some((track) => track.added_at !== undefined);
   const showDuration = tracks.some((track) => track.duration_ms !== undefined);
   // 列按需拼装：拖拽手柄 / 序号 / 标题 / 专辑? / 添加日期? / 时长? / 删除?
   // 动态列走内联样式——Tailwind 构建期扫描，运行时拼的 grid-cols 类不会生成
   const gridTemplateColumns = [
     ...(onMoveItem ? ['24px'] : []),
     '28px',
-    'minmax(220px,1fr)',
+    isDesktop ? 'minmax(220px,1fr)' : 'minmax(0,1fr)',
     ...(showAlbum ? ['minmax(140px,0.55fr)'] : []),
     ...(showAddedAt ? ['minmax(130px,0.5fr)'] : []),
     ...(showDuration ? ['64px'] : []),
@@ -675,7 +677,7 @@ export function TrackList({
     (showDuration ? 1 : 0) +
     (onRemoveItem ? 1 : 0);
   const tableWidthClass =
-    columnCount >= 6 ? 'min-w-[760px]' : columnCount === 5 ? 'min-w-[620px]' : columnCount === 4 ? 'min-w-[440px]' : 'min-w-[400px]';
+    columnCount >= 6 ? 'md:min-w-[760px]' : columnCount === 5 ? 'md:min-w-[620px]' : columnCount === 4 ? 'md:min-w-[440px]' : 'md:min-w-[400px]';
 
   // 新一批结果清空选择
   useEffect(() => {

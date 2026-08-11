@@ -360,7 +360,8 @@ export default function PlaylistDetailView(): JSX.Element {
           background: `linear-gradient(to bottom, color-mix(in srgb, ${headerColor} 55%, transparent), transparent)`,
         }}
       >
-        <div className="flex min-w-0 items-end gap-6 overflow-hidden">
+        {/* 移动端纵向（封面居中大图在上、文字块居左在下）；桌面端横向底对齐（Spotify 双形态） */}
+        <div className="flex min-w-0 flex-col gap-5 overflow-hidden md:flex-row md:items-end md:gap-6">
           {detail.playlist.cover_url && !coverFailed ? (
             <img
               src={coverSrc(detail.playlist.cover_url)}
@@ -370,20 +371,22 @@ export default function PlaylistDetailView(): JSX.Element {
                 setCoverFailed(true);
                 setHeaderColor('var(--panel-2)');
               }}
-              className="h-40 w-40 flex-none rounded-md object-cover shadow-2xl md:h-[232px] md:w-[232px]"
+              className="h-48 w-48 flex-none self-center rounded-md object-cover shadow-2xl md:h-[232px] md:w-[232px] md:self-auto"
             />
           ) : (
             <PlaylistCover
               playlist={{ ...detail.playlist, cover_url: '' }}
-              className="h-40 w-40 shadow-2xl [&_svg]:h-10 [&_svg]:w-10 md:h-[232px] md:w-[232px]"
+              className="h-48 w-48 self-center shadow-2xl [&_svg]:h-10 [&_svg]:w-10 md:h-[232px] md:w-[232px] md:self-auto"
             />
           )}
-          <div className="min-w-0 pb-1">
-            <p className="mb-2 text-xs font-semibold text-paper">{t('playlist.label')}</p>
-            <h1 className="line-clamp-2 text-4xl leading-[0.98] font-bold tracking-[-0.04em] text-paper md:text-6xl">
+          <div className="w-full min-w-0 md:w-auto md:pb-1">
+            <p className="mb-2 hidden text-xs font-semibold text-paper md:block">
+              {t('playlist.label')}
+            </p>
+            <h1 className="line-clamp-2 text-3xl leading-[1.02] font-bold tracking-[-0.04em] text-paper md:text-6xl md:leading-[0.98]">
               {detail.playlist.name}
             </h1>
-            <div className="mt-5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted">
+            <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-muted md:mt-5">
               {detail.playlist.description && (
                 <span className="min-w-0 truncate">{detail.playlist.description}</span>
               )}
@@ -429,7 +432,7 @@ export default function PlaylistDetailView(): JSX.Element {
           onClick={() => addPlaylist(false)}
           aria-label={playLabel}
           title={playLabel}
-          className="grid h-14 w-14 flex-none place-items-center rounded-full bg-accent text-on-accent shadow-lg transition-transform hover:scale-105 active:scale-100 disabled:opacity-40"
+          className="grid h-14 w-14 flex-none place-items-center rounded-full bg-accent text-on-accent shadow-lg transition-transform hover:scale-105 active:scale-100 disabled:opacity-40 max-md:order-last max-md:ml-auto"
         >
           <Play className="h-6 w-6 translate-x-px fill-current" aria-hidden="true" />
         </button>
@@ -467,7 +470,7 @@ export default function PlaylistDetailView(): JSX.Element {
             onClick={openMetaEditor}
             aria-label={t('playlist.editMeta')}
             title={t('playlist.editMeta')}
-            className="ml-auto grid h-10 w-10 flex-none place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper active:scale-95 disabled:opacity-40"
+            className="grid h-10 w-10 flex-none place-items-center rounded-full text-muted transition hover:bg-[var(--hover)] hover:text-paper active:scale-95 disabled:opacity-40 md:ml-auto"
           >
             <Pencil className="h-5 w-5" aria-hidden="true" />
           </button>
