@@ -91,7 +91,7 @@ yuzutify 起默认配色 = Spotify 风：深色板纯黑基底 + `#121212` 面�
 `--on-accent`。无衬线（--font-display 与 body 同 sans 族，标题靠字重分层）。
 
 1. `scheme`：深/浅基底色板，`<html data-scheme>` 切换，localStorage `yuzu-scheme`
-   锁定，默认跟随系统；index.html 有首帧前内联脚本防刷白。
+   锁定，内置默认深色（不跟随系统）；index.html 有首帧前内联脚本防刷白。
 2. `accent`：用户主题色，只写 `--accent`，派生靠 `color-mix`，`--on-accent`
    按 YIQ 亮度计算（`app/theme.ts`），localStorage `yuzu-accent`。
 3. `glow`：封面取色（`ui/glow.ts`），只作用于舞台辉光，与前两轴物理隔离。
@@ -129,6 +129,14 @@ Web 资源打包进 `android/`（`webDir: dist`），applicationId `dev.uwen.yuz
   MediaStyle 通知 + 播放期 partial wake lock。WebView 的
   `navigator.mediaSession` 没有系统出口（锁屏/蓝牙按键），所以原生端重做一份，
   JS 契约与 `app/mediasession.ts` 相同（`app/nativemedia.ts`，shell/state.ts 双写）。
+- `YuzuSystemBarsPlugin.java` + `app/nativeui.ts`：系统栏图标明暗跟随 App scheme。
+  targetSdk 36 强制 edge-to-edge（状态栏透明、Web 内容画到其下），基座 DayNight
+  主题只跟随系统——App 深色 + 系统浅色时深色图标压在深色内容上不可见。Web 主题轴
+  `applyScheme`/`initTheme` 经 `syncSystemBars` 驱动
+  `appearanceLightStatusBars/NavigationBars`。nativeui 刻意不 import nativemedia
+  （theme 是底层模块，经 session 装配会拉回循环依赖）。Web 侧配套：移动壳顶部有
+  渐变模糊幕（backdrop-blur + mask 渐隐，MobileShell），滚动内容在状态栏系统
+  图标前淡出。
 - 保活语义：房间有当前曲目即起服务，离房/停止即停；唤醒锁只在 playing 时持有。
 - **Capacitor 桥数值读取坑**：`PluginCall.getLong()` 只接受 org.json 解析为 `Long`
   的值——JS 侧 int 范围的数字（positionMs/durationMs 这类几万~几十万）会被 JSONObject
@@ -162,9 +170,10 @@ Web 资源打包进 `android/`（`webDir: dist`），applicationId `dev.uwen.yuz
   **包名白名单**（`oplusActionConfig` 内置 + OPPO RUS 云控 `RUS_LYRIC_ENTRANCE_KEY`）
   发放，标准 MediaSession API 无任何请求机制，非 Root/LSPosed 无解（原项目
   ColorOS-Live-Lyrics-Bridge 正是 hook 该方法强制返回 52）。勿再尝试系统侧全屏。
-- `ui/backbutton.ts`：返回键统一分发——覆盖层关闭栈栈顶先收，非根页面 history
-  后退，根部 minimizeApp（**不能 finish Activity**：Activity 销毁 = WebView 销毁 =
-  停止出声）。
+- `ui/backbutton.ts`：返回键统一分发——覆盖层关闭栈栈顶先收，然后按
+  React Router 写进 `history.state.idx` 判定（idx > 0 即 history 后退，与移动端
+  顶栏返回钮同源；首条恒为 0），退无可退时 minimizeApp（**不能 finish Activity**：
+  Activity 销毁 = WebView 销毁 = 停止出声）。
 - 服务端地址：原生平台 localStorage `yuzu-server`（App 内登录页/账户菜单可改）
   > config.js > VITE_*；改地址会清 `yuzu-session`/`yuzu-room-credentials`/
   `yuzu-last-room` 并 reload。cleartext 走 manifest `usesCleartextTraffic`
@@ -224,7 +233,7 @@ IdP 侧待办：新增 PKCE(User-Agent)应用 → 其 client_id 加入服务端
 WebUI 侧配置：`public/config.js`（运行期，部署后可直接编辑无需重建）——
 `server` 服务端基址（空 = 同源）、`oidc_client_id` PKCE 应用 id（空 = 回退服务端
 oidcConfig 主 id）、`title` 网页标题、`favicon` 图标（空 = 内置 favicon.svg）、
-`accent` 默认主题色、`scheme` 默认深浅色（空 = 跟随系统）、
+`accent` 默认主题色、`scheme` 默认深浅色（空 = 内置深色）、
 `admin_password_enabled` 是否显示访客管理员口令框（仅当服务端
 `admin_password` 非空时为 true；公域留空则 false）。
 优先级：server/oidc/admin_password_enabled 为（原生平台 localStorage `yuzu-server` 用户自选 >）
