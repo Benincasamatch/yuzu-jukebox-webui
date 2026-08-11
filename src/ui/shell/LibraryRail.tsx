@@ -6,17 +6,11 @@ import { DropdownMenu } from 'radix-ui';
 import type { PlaylistInfo } from '../../api/types';
 import { api } from '../../app/session';
 import { ImportPlaylistDialog } from '../ImportPlaylistDialog';
+import { CreatePlaylistDialog } from '../CreatePlaylistDialog';
 import { PlaylistCover } from '../LibraryList';
 import { useIdentity } from '../hooks';
-import { Dialog } from '../primitives';
 import { useToast } from '../toast';
 
-const inputClass =
-  'mt-1.5 w-full rounded-md border border-hairline bg-panel px-3 py-2 text-[13px] text-paper placeholder:text-faint focus:border-accent focus:outline-none';
-const primaryButtonClass =
-  'rounded-full bg-accent px-4 py-1.5 text-[13px] font-medium text-on-accent hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40';
-const secondaryButtonClass =
-  'rounded-full border border-hairline px-4 py-1.5 text-[13px] text-muted hover:border-faint hover:text-paper disabled:cursor-not-allowed disabled:opacity-40';
 const menuItemClass =
   'flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] text-muted outline-none data-[highlighted]:bg-[var(--hover)] data-[highlighted]:text-paper';
 
@@ -27,12 +21,9 @@ export function LibraryRail() {
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<PlaylistInfo[] | null>(null);
   const identity = useIdentity();
-  const { show, showError } = useToast();
+  const { showError } = useToast();
   const canManageMedia = identity?.roles.includes('media_admin') ?? false;
   const [createOpen, setCreateOpen] = useState(false);
-  const [createName, setCreateName] = useState('');
-  const [createDescription, setCreateDescription] = useState('');
-  const [createBusy, setCreateBusy] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
@@ -52,27 +43,6 @@ export function LibraryRail() {
       cancelled = true;
     };
   }, [location.pathname, showError]);
-
-  const createPlaylist = async () => {
-    const name = createName.trim();
-    if (!name || createBusy) return;
-    setCreateBusy(true);
-    try {
-      const playlist = await api.createPlaylist({
-        name,
-        description: createDescription.trim() || undefined,
-      });
-      setCreateOpen(false);
-      setCreateName('');
-      setCreateDescription('');
-      show(t('lib.created'));
-      navigate(`/playlist/${encodeURIComponent(playlist.id)}`);
-    } catch (error: unknown) {
-      showError(error);
-    } finally {
-      setCreateBusy(false);
-    }
-  };
 
   return (
     <aside className="flex h-full w-full flex-col rounded-lg bg-panel">
@@ -155,57 +125,11 @@ export function LibraryRail() {
 
       {canManageMedia && (
         <>
-          <Dialog open={createOpen} onOpenChange={setCreateOpen} title={t('lib.createDialogTitle')}>
-            <form
-              onSubmit={(event) => {
-                event.preventDefault();
-                void createPlaylist();
-              }}
-            >
-              <label className="block text-xs text-muted" htmlFor="library-playlist-name">
-                {t('lib.nameLabel')}
-              </label>
-              <input
-                id="library-playlist-name"
-                value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
-                placeholder={t('lib.namePlaceholder')}
-                className={inputClass}
-                required
-              />
-              <label
-                className="mt-4 block text-xs text-muted"
-                htmlFor="library-playlist-description"
-              >
-                {t('lib.descriptionLabel')}
-              </label>
-              <textarea
-                id="library-playlist-description"
-                value={createDescription}
-                onChange={(event) => setCreateDescription(event.target.value)}
-                placeholder={t('lib.descriptionPlaceholder')}
-                rows={3}
-                className={`${inputClass} resize-y`}
-              />
-              <div className="mt-5 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCreateOpen(false)}
-                  disabled={createBusy}
-                  className={secondaryButtonClass}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={createBusy || !createName.trim()}
-                  className={primaryButtonClass}
-                >
-                  {createBusy ? t('lib.creating') : t('lib.createAction')}
-                </button>
-              </div>
-            </form>
-          </Dialog>
+          <CreatePlaylistDialog
+            open={createOpen}
+            onOpenChange={setCreateOpen}
+            onCreated={(playlist) => navigate(`/playlist/${encodeURIComponent(playlist.id)}`)}
+          />
 
           <ImportPlaylistDialog
             open={importOpen}
