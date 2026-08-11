@@ -17,7 +17,7 @@ import {
   Unlink,
   Upload,
 } from 'lucide-react';
-import type { PlaylistDetail, UpdatePlaylistMetaInput } from '../api/types';
+import type { PlaylistDetail, PlaylistItem, UpdatePlaylistMetaInput } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { coverSrc } from './cover';
 import { formatDateTime } from './format';
@@ -32,6 +32,8 @@ import { useToast } from './toast';
 
 const PAGE_SIZE = 50;
 const QUEUE_CHUNK_SIZE = 100;
+/** memo 依赖的稳定空数组（detail 未加载时的占位，避免每次 render 重建） */
+const EMPTY_ITEMS: PlaylistItem[] = [];
 function shuffleRefs(refs: string[]): void {
   for (let index = refs.length - 1; index > 0; index -= 1) {
     const randomIndex = Math.floor(Math.random() * (index + 1));
@@ -71,6 +73,23 @@ export default function PlaylistDetailView(): JSX.Element {
       detail?.playlist.cover_url ? coverSrc(detail.playlist.cover_url) : undefined,
       detail?.playlist.id,
     ) ?? 'var(--panel-2)';
+  // memo：detail.items 变化才重建（分页追加）；否则 TrackList 的「换曲清选择」
+  // effect 会在每次重渲染触发，移动端点选随滚动/加载被清掉。
+  // 必须放在任何提前 return 之前（hooks 顺序），且回调容忍 detail 未加载（null）。
+  const items = detail?.items ?? EMPTY_ITEMS;
+  const tracks: TrackListTrack[] = useMemo(
+    () =>
+      items.map((item) => ({
+        track_ref: item.track_ref,
+        title: item.title,
+        artist: item.artist,
+        duration_ms: item.duration_ms,
+        contributors: item.contributors,
+        added_at: item.added_at,
+        ord: item.ord,
+      })),
+    [items],
+  );
   const canManage = identity?.roles.includes('media_admin') ?? false;
   const canEditMeta = Boolean(
     identity &&
@@ -345,21 +364,6 @@ export default function PlaylistDetailView(): JSX.Element {
     normalizedMetaDescription !== detail.playlist.description ||
     metaPinned !== Boolean(detail.playlist.pinned);
   const playLabel = busy ? t('batch.adding') : t('playlist.addAll');
-  // memo：detail.items 变化才重建（分页追加）；否则 TrackList 的「换曲清选择」
-  // effect 会在每次重渲染触发，移动端点选随滚动/加载被清掉
-  const tracks: TrackListTrack[] = useMemo(
-    () =>
-      detail.items.map((item) => ({
-        track_ref: item.track_ref,
-        title: item.title,
-        artist: item.artist,
-        duration_ms: item.duration_ms,
-        contributors: item.contributors,
-        added_at: item.added_at,
-        ord: item.ord,
-      })),
-    [detail.items],
-  );
   const trackMenuItems: ((track: TrackListTrack) => TrackMenuItem[]) | undefined = canEditItems
     ? (track) =>
         track.ord === undefined

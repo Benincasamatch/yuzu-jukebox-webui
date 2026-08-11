@@ -38,8 +38,14 @@ export function FullscreenPlayer(props: {
 
   const [, forceTick] = useReducer((x: number) => x + 1, 0);
   const [glow, setGlow] = useState<[string, string] | null>(null);
-  // 移动端视图：封面 ↔ 歌词（点击切换）
+  // 移动端视图：封面 ↔ 歌词（点击切换）。everSwitched：首挂载时非活动视图
+  // 用静态 view-hidden（0 透明度），避免 view-leave 动画从 1 起步闪一帧
   const [view, setView] = useState<'cover' | 'lyrics'>('cover');
+  const [everSwitched, setEverSwitched] = useState(false);
+  const switchView = useCallback((v: 'cover' | 'lyrics') => {
+    setView(v);
+    setEverSwitched(true);
+  }, []);
   // chrome 自动隐去：活动后 2.8s 无操作即淡出（光标同隐），任何指针活动唤醒
   const [chromeVisible, setChromeVisible] = useState(true);
   const idleTimerRef = useRef<number | null>(null);
@@ -188,9 +194,7 @@ export function FullscreenPlayer(props: {
       className={`fullscreen-enter fixed inset-0 z-50 overflow-y-auto overscroll-contain bg-hall ${
         chromeVisible ? '' : 'cursor-none'
       } ${
-        closing
-          ? 'translate-y-full opacity-0 transition-[transform,opacity] duration-300 ease-out'
-          : ''
+        closing ? 'fullscreen-exit' : ''
       }`}
       onPointerMove={wake}
     >
@@ -199,7 +203,7 @@ export function FullscreenPlayer(props: {
       <button
         onClick={closePlayer}
         title={t('room.closePlayer')}
-        className={`fixed top-[calc(env(safe-area-inset-top)+1.25rem)] right-[calc(env(safe-area-inset-right)+1.5rem)] z-10 grid h-10 w-10 place-items-center rounded-full border border-white/15 text-muted backdrop-blur-sm after:absolute after:-inset-1 after:content-[''] hover:border-white/35 hover:text-paper bg-black/25 ${chromeFade}`}
+        className={`fixed top-[calc(env(safe-area-inset-top)+1.25rem)] right-[calc(env(safe-area-inset-right)+1.5rem)] z-10 grid h-10 w-10 place-items-center rounded-full text-muted after:absolute after:-inset-1 after:content-[''] hover:text-paper ${chromeFade}`}
       >
         <ChevronDown className="h-4.5 w-4.5" />
       </button>
@@ -210,80 +214,82 @@ export function FullscreenPlayer(props: {
           role="button"
           tabIndex={0}
           aria-label={t('room.showLyrics')}
-          onClick={() => setView('lyrics')}
+          aria-hidden={view !== 'cover'}
+          onClick={() => switchView('lyrics')}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              setView('lyrics');
+              switchView('lyrics');
             }
           }}
-          className={`absolute inset-0 flex flex-col text-center transition-opacity duration-300 landscape:flex-row landscape:items-center landscape:gap-8 ${
-            view === 'cover' ? 'opacity-100' : 'pointer-events-none opacity-0'
+          className={`absolute inset-0 flex flex-col text-center landscape:flex-row landscape:items-center landscape:gap-8 ${
+            view === 'cover' ? 'view-enter' : 'view-leave'
           }`}
         >
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
-            {current.cover_url ? (
-              <img
-                src={originalCoverSrc(current.cover_url)}
-                alt=""
-                onLoad={grabGlow}
-                className="aspect-square w-56 rounded-xl object-cover landscape:w-32 sm:w-64 sm:landscape:w-40"
-                style={{ boxShadow: 'var(--cover-shadow)' }}
-              />
-            ) : (
-              <div className="aspect-square w-56 rounded-xl bg-panel-2 landscape:w-32 sm:w-64 sm:landscape:w-40" />
-            )}
-          </div>
-          <div className="px-2 pb-9 landscape:flex-1 landscape:pb-0 landscape:text-left">
-            <h2 className="text-2xl leading-tight font-bold tracking-tight">{current.title}</h2>
-            <div className="mt-1 text-[13px] text-muted">
-              <ArtistLinks
-                artist={current.artist}
-                contributors={current.contributors}
-                trackRef={current.track_ref}
-                onNavigate={onClose}
-              />
-              {current.album && <span className="text-faint"> · {current.album}</span>}
-            </div>
-            <div className="mt-5 px-4 landscape:px-0">
-              <div className="h-[3px] overflow-hidden rounded bg-white/15">
-                <div
-                  className="progress-glide h-full rounded bg-accent"
-                  style={{ width: `${pct}%` }}
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
+              {current.cover_url ? (
+                <img
+                  src={originalCoverSrc(current.cover_url)}
+                  alt=""
+                  onLoad={grabGlow}
+                  className="aspect-square w-56 rounded-xl object-cover landscape:w-32 sm:w-64 sm:landscape:w-40"
+                  style={{ boxShadow: 'var(--cover-shadow)' }}
                 />
-              </div>
-              <div className="mt-1.5 flex justify-between font-mono text-[11.5px] text-muted tabular-nums">
-                <span>{formatMs(pos)}</span>
-                <span>{formatMs(current.duration_ms)}</span>
-              </div>
-              {personalPaused && (
-                <p className="mt-2 text-[11px] text-faint">{t('room.personalPausedHint')}</p>
+              ) : (
+                <div className="aspect-square w-56 rounded-xl bg-panel-2 landscape:w-32 sm:w-64 sm:landscape:w-40" />
               )}
             </div>
-            <div className="mt-4 flex items-center justify-center gap-4 landscape:justify-start">
-              {personalPauseButton}
-              <span onClick={(e) => e.stopPropagation()}>
-                <SimilarButton className="grid h-11 w-11 place-items-center rounded-full border border-white/15 text-muted hover:border-white/35 hover:text-paper" />
-              </span>
+            <div className="px-2 pb-9 landscape:flex-1 landscape:pb-0 landscape:text-left">
+              <h2 className="text-2xl leading-tight font-bold tracking-tight">{current.title}</h2>
+              <div className="mt-1 text-[13px] text-muted">
+                <ArtistLinks
+                  artist={current.artist}
+                  contributors={current.contributors}
+                  trackRef={current.track_ref}
+                  onNavigate={onClose}
+                />
+                {current.album && <span className="text-faint"> · {current.album}</span>}
+              </div>
+              <div className="mt-5 px-4 landscape:px-0">
+                <div className="h-[3px] overflow-hidden rounded bg-white/15">
+                  <div
+                    className="progress-glide h-full rounded bg-accent"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="mt-1.5 flex justify-between font-mono text-[11.5px] text-muted tabular-nums">
+                  <span>{formatMs(pos)}</span>
+                  <span>{formatMs(current.duration_ms)}</span>
+                </div>
+                {personalPaused && (
+                  <p className="mt-2 text-[11px] text-faint">{t('room.personalPausedHint')}</p>
+                )}
+              </div>
+              <div className="mt-4 flex items-center justify-center gap-4 landscape:justify-start">
+                {personalPauseButton}
+                <span onClick={(e) => e.stopPropagation()}>
+                  <SimilarButton className="grid h-11 w-11 place-items-center rounded-full border border-white/15 text-muted hover:border-white/35 hover:text-paper" />
+                </span>
+              </div>
             </div>
           </div>
-        </div>
 
         <div
           role="button"
           tabIndex={0}
           aria-label={t('room.showCover')}
-          onClick={() => setView('cover')}
+          aria-hidden={view !== 'lyrics'}
+          onClick={() => switchView('cover')}
           onKeyDown={(e) => {
             if (e.target !== e.currentTarget) return;
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              setView('cover');
+              switchView('cover');
             }
           }}
-          className={`absolute inset-0 overflow-hidden transition-opacity duration-300 ${
-            view === 'lyrics' ? 'opacity-100' : 'pointer-events-none opacity-0'
+          className={`absolute inset-0 overflow-hidden ${
+            view === 'lyrics' ? 'view-enter' : everSwitched ? 'view-leave' : 'view-hidden'
           }`}
         >
           <div className="h-full px-2 py-12">{lyricsBlock('center')}</div>
