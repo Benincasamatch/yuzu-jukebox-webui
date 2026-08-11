@@ -2,7 +2,7 @@
  * 歌单详情页：浏览歌单条目、单首点歌、整单入队。
  * 入队目标恒为当前房间——未入房时按钮引导先选房间。
  */
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DropdownMenu } from 'radix-ui';
@@ -158,6 +158,24 @@ export default function PlaylistDetailView(): JSX.Element {
       .catch(showError)
       .finally(() => setLoadingMore(false));
   };
+
+  // 触底自动加载：哨兵进入视口（提前 240px）即取下一页，替代手动「加载更多」按钮
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const loadMoreFnRef = useRef(loadMore);
+  loadMoreFnRef.current = loadMore;
+  useEffect(() => {
+    const el = loadMoreRef.current;
+    const hasMore = detail !== null && detail.items.length < detail.playlist.track_count;
+    if (!el || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMoreFnRef.current();
+      },
+      { rootMargin: '240px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [detail?.items.length, detail?.playlist.track_count]);
 
   const requireRoom = (): boolean => {
     if (state.roomId) return true;
@@ -327,15 +345,21 @@ export default function PlaylistDetailView(): JSX.Element {
     normalizedMetaDescription !== detail.playlist.description ||
     metaPinned !== Boolean(detail.playlist.pinned);
   const playLabel = busy ? t('batch.adding') : t('playlist.addAll');
-  const tracks: TrackListTrack[] = detail.items.map((item) => ({
-    track_ref: item.track_ref,
-    title: item.title,
-    artist: item.artist,
-    duration_ms: item.duration_ms,
-    contributors: item.contributors,
-    added_at: item.added_at,
-    ord: item.ord,
-  }));
+  // memo：detail.items 变化才重建（分页追加）；否则 TrackList 的「换曲清选择」
+  // effect 会在每次重渲染触发，移动端点选随滚动/加载被清掉
+  const tracks: TrackListTrack[] = useMemo(
+    () =>
+      detail.items.map((item) => ({
+        track_ref: item.track_ref,
+        title: item.title,
+        artist: item.artist,
+        duration_ms: item.duration_ms,
+        contributors: item.contributors,
+        added_at: item.added_at,
+        ord: item.ord,
+      })),
+    [detail.items],
+  );
   const trackMenuItems: ((track: TrackListTrack) => TrackMenuItem[]) | undefined = canEditItems
     ? (track) =>
         track.ord === undefined
@@ -564,20 +588,28 @@ export default function PlaylistDetailView(): JSX.Element {
         {detail.items.length === 0 ? (
           <p className="py-10 text-center text-sm text-muted">{t('batch.playlistEmpty')}</p>
         ) : (
-          <TrackList
-            tracks={tracks}
-            menuItems={trackMenuItems}
-            onMoveItem={canEditItems && editMode ? moveItem : undefined}
-            onRemoveItem={
-              canEditItems && editMode
-                ? (track) => {
-                    if (track.ord !== undefined) void removeItem(track.ord);
-                  }
-                : undefined
-            }
-            onLoadMore={detail.items.length < detail.playlist.track_count ? loadMore : undefined}
-            loadingMore={loadingMore}
-          />
+          <>
+            <TrackList
+              tracks={tracks}
+              menuItems={trackMenuItems}
+              onMoveItem={canEditItems && editMode ? moveItem : undefined}
+              onRemoveItem={
+                canEditItems && editMode
+                  ? (track) => {
+                      if (track.ord !== undefined) void removeItem(track.ord);
+                    }
+                  : undefined
+              }
+            />
+            {detail.items.length < detail.playlist.track_count && (
+              <>
+                <div ref={loadMoreRef} aria-hidden="true" className="h-10" />
+                {loadingMore && (
+                  <p className="pb-6 text-center text-xs text-faint">{t('common.loading')}</p>
+                )}
+              </>
+            )}
+          </>
         )}
       </div>
 
