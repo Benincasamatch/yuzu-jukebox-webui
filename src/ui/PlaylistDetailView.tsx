@@ -2,7 +2,7 @@
  * 歌单详情页：浏览歌单条目、单首点歌、整单入队。
  * 入队目标恒为当前房间——未入房时按钮引导先选房间。
  */
-import { useEffect, useRef, useState, type JSX, type SyntheticEvent } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DropdownMenu } from 'radix-ui';
@@ -21,7 +21,7 @@ import type { PlaylistDetail, UpdatePlaylistMetaInput } from '../api/types';
 import { api, roomStore } from '../app/session';
 import { coverSrc } from './cover';
 import { formatDateTime } from './format';
-import { extractGlowColors } from './glow';
+import { useCoverColor } from './useCoverColor';
 import { useIdentity, useRoomState } from './hooks';
 import { PlaylistCover } from './LibraryList';
 import { ConfirmDialog, Dialog } from './primitives';
@@ -62,9 +62,14 @@ export default function PlaylistDetailView(): JSX.Element {
   const [metaSaving, setMetaSaving] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [headerColor, setHeaderColor] = useState('var(--panel-2)');
   const [coverFailed, setCoverFailed] = useState(false);
   const coverInputRef = useRef<HTMLInputElement | null>(null);
+  // hero 渐变取色：显示图 no-cors（跨源必污染画布），由隐藏 CORS 探针取色；
+  // 服务端对带 Origin 的封面请求流式回源 + ACAO（见服务端 proxyCover）
+  const headerColor =
+    useCoverColor(
+      detail?.playlist.cover_url ? coverSrc(detail.playlist.cover_url) : undefined,
+    ) ?? 'var(--panel-2)';
   const canManage = identity?.roles.includes('media_admin') ?? false;
   const canEditMeta = Boolean(
     identity &&
@@ -78,7 +83,6 @@ export default function PlaylistDetailView(): JSX.Element {
     setDeleteOpen(false);
     setEditMode(false);
     setMetaEditOpen(false);
-    setHeaderColor('var(--panel-2)');
     setCoverFailed(false);
     let dead = false;
     api
@@ -101,7 +105,6 @@ export default function PlaylistDetailView(): JSX.Element {
     const refreshed = await api.getPlaylist(playlistId, 0, PAGE_SIZE);
     setDetail(refreshed);
     setFailed(false);
-    setHeaderColor('var(--panel-2)');
     setCoverFailed(false);
   };
 
@@ -298,10 +301,6 @@ export default function PlaylistDetailView(): JSX.Element {
       .finally(() => setManagementBusy(false));
   };
 
-  const handleCoverLoad = (event: SyntheticEvent<HTMLImageElement>) => {
-    setHeaderColor(extractGlowColors(event.currentTarget)?.[0] ?? 'var(--panel-2)');
-  };
-
   if (failed) {
     return (
       <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
@@ -366,13 +365,8 @@ export default function PlaylistDetailView(): JSX.Element {
             <img
               src={coverSrc(detail.playlist.cover_url)}
               alt={t('playlist.coverAlt', { name: detail.playlist.name })}
-              // 跨域部署（Capacitor origin = https://localhost）下 canvas 取色
-              // 需 CORS 模式加载，否则画布被污染、渐变色取不到
-              crossOrigin="anonymous"
-              onLoad={handleCoverLoad}
               onError={() => {
                 setCoverFailed(true);
-                setHeaderColor('var(--panel-2)');
               }}
               className="h-48 w-48 flex-none self-center rounded-md object-cover shadow-2xl md:h-[232px] md:w-[232px] md:self-auto"
             />

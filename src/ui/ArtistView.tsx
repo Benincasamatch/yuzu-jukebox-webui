@@ -12,15 +12,15 @@
  * 注意：useParams 返回的路由参数已被 react-router 解码，不得再 decodeURIComponent
  * （曾对含 % 的艺人名双重解码抛 URIError，整树白屏）。
  */
-import { useCallback, useEffect, useState, type JSX, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Disc3, Play, User } from 'lucide-react';
 import type { SearchEntity, SearchTrack } from '../api/types';
 import { api } from '../app/session';
 import { coverSrc, originalCoverSrc } from './cover';
-import { extractGlowColors } from './glow';
 import { TrackList, searchTrackToRow, useEnqueue } from './TrackList';
+import { useCoverColor } from './useCoverColor';
 import { useProviders } from './hooks';
 import { useToast } from './toast';
 
@@ -54,12 +54,11 @@ export default function ArtistView(): JSX.Element {
   const [busy, setBusy] = useState(false);
   // 热门曲目默认只展示前 5 首（Spotify Popular 形态），展开后显示全部
   const [tracksExpanded, setTracksExpanded] = useState(false);
-  // 移动端 hero 渐变取色（头像主色，与歌单页 headerColor 同手法；头像缺失回退面板色）
-  const [heroColor, setHeroColor] = useState('var(--panel-2)');
-
-  const handleAvatarLoad = (event: SyntheticEvent<HTMLImageElement>) => {
-    setHeroColor(extractGlowColors(event.currentTarget)?.[0] ?? 'var(--panel-2)');
-  };
+  // hero 取色：显示图 no-cors（跨源必污染画布），由隐藏 CORS 探针取色；
+  // 服务端对带 Origin 的封面请求流式回源 + ACAO（见服务端 proxyCover）
+  const heroColor =
+    useCoverColor(resolved?.avatarUrl ? coverSrc(resolved.avatarUrl) : undefined) ??
+    'var(--panel-2)';
 
   useEffect(() => {
     let dead = false;
@@ -148,10 +147,6 @@ export default function ArtistView(): JSX.Element {
     };
   }, [providerId, entityId, entityAlbums, showError]);
 
-  useEffect(() => {
-    setHeroColor('var(--panel-2)');
-  }, [name]);
-
   const openAlbum = useCallback(
     (album: SearchEntity) => {
       if (!providerId || !entityId || !album.entity_id || busy) return;
@@ -185,8 +180,6 @@ export default function ArtistView(): JSX.Element {
             <img
               src={originalCoverSrc(resolved.avatarUrl)}
               alt=""
-              crossOrigin="anonymous"
-              onLoad={handleAvatarLoad}
               className="mx-auto h-44 w-44 rounded-full object-cover shadow-2xl"
             />
           ) : (
@@ -214,8 +207,6 @@ export default function ArtistView(): JSX.Element {
           <img
             src={originalCoverSrc(resolved.avatarUrl)}
             alt=""
-            crossOrigin="anonymous"
-            onLoad={handleAvatarLoad}
             className="absolute inset-0 h-full w-full object-cover object-[center_22%]"
           />
         ) : (
