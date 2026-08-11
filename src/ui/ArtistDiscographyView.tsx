@@ -51,7 +51,7 @@ export default function ArtistDiscographyView(): JSX.Element {
       : '';
 
   return (
-    <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
+    <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
       <Link
         to={`/artist/${encodeURIComponent(name)}${artistQuery}`}
         className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-muted transition hover:text-paper"

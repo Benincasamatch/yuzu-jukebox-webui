@@ -89,7 +89,7 @@ export default function SearchView(): JSX.Element {
   }, [query, provider]);
 
   return (
-    <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
+    <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
       {/* 移动端输入框：顶栏搜索 icon 跳转到这里，页面自带输入（桌面端用顶栏输入框）。
           provider 切换折叠在框内左侧（与桌面顶栏同一交互） */}
       <form

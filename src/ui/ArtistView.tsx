@@ -180,7 +180,7 @@ export default function ArtistView(): JSX.Element {
           background: `linear-gradient(to bottom, color-mix(in srgb, ${heroColor} 55%, transparent), transparent)`,
         }}
       >
-        <div className="flex flex-col px-4 pt-8 pb-5">
+        <div className="flex flex-col px-4 pt-[calc(var(--header-h)+1rem)] pb-5">
           {resolved?.avatarUrl ? (
             <img
               src={originalCoverSrc(resolved.avatarUrl)}

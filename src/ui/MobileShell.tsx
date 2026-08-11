@@ -34,29 +34,32 @@ export default function MobileShell() {
           </div>
         )}
 
-        {/* 移动顶栏：可返回时返回钮（无分割线、无品牌字）；搜索在底部 TabBar，
-            主题收进账户菜单，管理不带入移动端 */}
-        <header className="flex flex-none items-center gap-2 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
-          {canGoBack && (
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              aria-label={t('common.back')}
-              title={t('common.back')}
-              className="grid h-8 w-8 flex-none place-items-center rounded-full text-paper transition hover:bg-[var(--hover)]"
-            >
-              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-            </button>
-          )}
-          <div className="flex-1" />
-          <AccountMenu compact themeInMenu onRoomsClick={() => value.setRoomsOpen(true)} />
-        </header>
-
-        {/* 内容区：整高滚动，底部留白让位浮层 chrome（--chrome-b + 渐变淡出区） */}
+        {/* 内容区：整高滚动；顶栏与底部 chrome 都是浮层，hero 页（歌单/歌手）
+            的渐变直抵屏幕顶（Spotify 移动沉浸形态），普通页自带 --header-h 上留白 */}
         <div className="relative min-h-0 flex-1">
           <main className="h-full overflow-y-auto pb-[calc(var(--chrome-b)+2.5rem)]">
             <Outlet />
           </main>
+
+          {/* 顶栏浮层：透明压在内容上；可返回时返回钮（半透明圆底保可读性），
+              账户菜单居右。搜索在底部 TabBar，主题收进账户菜单，管理不带入移动端 */}
+          <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center gap-2 px-3 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+            {canGoBack && (
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                aria-label={t('common.back')}
+                title={t('common.back')}
+                className="pointer-events-auto grid h-8 w-8 flex-none place-items-center rounded-full bg-hall/70 text-paper backdrop-blur-sm transition hover:bg-hall"
+              >
+                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              </button>
+            )}
+            <div className="flex-1" />
+            <div className="pointer-events-auto">
+              <AccountMenu compact themeInMenu onRoomsClick={() => value.setRoomsOpen(true)} />
+            </div>
+          </header>
 
           {/* 底部 chrome 浮层（Spotify 移动形态）：内容滚入渐变淡出区，
               悬浮播放条 + TabBar 叠在壳底色上 */}

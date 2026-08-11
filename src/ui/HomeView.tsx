@@ -24,7 +24,7 @@ export default function HomeView(): JSX.Element {
   const identity = useIdentity();
 
   return (
-    <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
+    <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
       <h1 className="text-[32px] font-bold text-paper">
         {t('lobby.greeting', { period: t(greetingKey()), name: identity?.name ?? '' })}
       </h1>

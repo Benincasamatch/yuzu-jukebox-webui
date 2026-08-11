@@ -304,7 +304,7 @@ export default function PlaylistDetailView(): JSX.Element {
 
   if (failed) {
     return (
-      <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
+      <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
         <p className="text-muted">{t('error.internal')}</p>
       </div>
     );
@@ -312,7 +312,7 @@ export default function PlaylistDetailView(): JSX.Element {
 
   if (!detail) {
     return (
-      <div className="view-enter px-4 pt-4 pb-10 md:px-8 md:pt-6">
+      <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
         <p className="text-muted">{t('batch.playlistLoading')}</p>
       </div>
     );
@@ -355,7 +355,7 @@ export default function PlaylistDetailView(): JSX.Element {
   return (
     <div className="view-enter pb-10">
       <section
-        className="px-4 pt-8 pb-7 md:px-7 md:pt-12 md:pb-8"
+        className="px-4 pt-[calc(var(--header-h)+1rem)] pb-7 md:px-7 md:pt-12 md:pb-8"
         style={{
           background: `linear-gradient(to bottom, color-mix(in srgb, ${headerColor} 55%, transparent), transparent)`,
         }}

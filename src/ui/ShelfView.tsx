@@ -40,7 +40,7 @@ function ShelfScaffold({
 }): JSX.Element {
   const { t } = useTranslation();
   return (
-    <div className="view-enter px-4 pt-6 pb-10 md:px-8">
+    <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
       <h1 className="text-2xl font-bold text-paper">{title}</h1>
       {items === null ? (
         <p className="mt-6 text-sm text-muted">{t('common.loading')}</p>
