@@ -4,6 +4,7 @@
  * （audio/renderer/client/roomStore）仍是组合根单例，壳只是消费者。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { httpBase } from '../../config';
 import {
   api,
@@ -134,10 +135,14 @@ function usePlaybackWiring(canControl: boolean): void {
 /** 组装 ShellValue：joinRoom/leaveRoom/nameOf/autoJoin + 抽屉开合状态。 */
 export function useShellState(): ShellValue {
   const state = useRoomState();
+  const location = useLocation();
   const identity = useIdentity();
   const { showError } = useToast();
   const { canControl, canRadio } = useCapabilities();
   usePlaybackWiring(canControl);
+
+  // 全屏播放器：桌面/移动播放条与深链入口共用同一开合意图；仅壳挂载期存活。
+  const [fullscreenOpen, setFullscreenOpen] = useState(false);
 
   // 右面板槽位：Now Playing 常驻默认态，queue/rooms 原位叠加、关闭回到
   // Now Playing（Spotify 同槽复用）。折叠只对 Now Playing 有意义：折叠为
@@ -206,6 +211,9 @@ export function useShellState(): ShellValue {
   useEffect(() => {
     if (autoJoinTried.current) return;
     autoJoinTried.current = true;
+    // 深链由 RoomDeepLink 携带自己的目标房间/凭据；自动入房若并发发起会 supersede
+    // 该 join（尤其本机记有上次房间时），所以深链入口必须独占首次入房动作。
+    if (location.pathname.startsWith('/r/') || location.pathname.startsWith('/room/')) return;
     if (roomStore.getState().roomId) return;
     const last = getPersistedRoomId();
     if (last) {
@@ -218,7 +226,7 @@ export function useShellState(): ShellValue {
         if (rooms.length === 1 && !roomStore.getState().roomId) void joinRoom(rooms[0].id);
       })
       .catch(() => {});
-  }, [joinRoom]);
+  }, [joinRoom, location.pathname]);
 
   // ---------- requester 名字解析 ----------
 
@@ -234,6 +242,8 @@ export function useShellState(): ShellValue {
     nameOf,
     joinRoom,
     leaveRoom,
+    fullscreenOpen,
+    setFullscreenOpen,
     rightPanel,
     setRightPanel,
     nowPlayingCollapsed,

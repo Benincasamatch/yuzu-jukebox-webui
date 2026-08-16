@@ -33,8 +33,14 @@ function positionOf(playback: {
 export function MobilePlayerBar(): JSX.Element | null {
   const { t } = useTranslation();
   const state = useRoomState();
-  const { nameOf, queueOpen, setQueueOpen, setRoomsOpen } = useShell();
-  const [playerOpen, setPlayerOpen] = useState(false);
+  const {
+    nameOf,
+    fullscreenOpen,
+    setFullscreenOpen,
+    queueOpen,
+    setQueueOpen,
+    setRoomsOpen,
+  } = useShell();
   const [personalPaused, setPersonalPaused] = useState(() => renderer.isPersonalPaused);
   const [, forceTick] = useReducer((x: number) => x + 1, 0);
 
@@ -115,7 +121,7 @@ export function MobilePlayerBar(): JSX.Element | null {
 
       <button
         type="button"
-        onClick={() => setPlayerOpen(true)}
+        onClick={() => setFullscreenOpen(true)}
         className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
       >
         {shown.cover_url ? (
@@ -160,13 +166,13 @@ export function MobilePlayerBar(): JSX.Element | null {
         <ListMusic className="h-4 w-4" />
       </button>
 
-      {playerOpen && current && (
+      {fullscreenOpen && current && (
         <FullscreenPlayer
           playback={playback}
           nameOf={nameOf}
           lines={lyrics}
           lyricsLoading={lyricsLoading}
-          onClose={() => setPlayerOpen(false)}
+          onClose={() => setFullscreenOpen(false)}
         />
       )}
     </div>

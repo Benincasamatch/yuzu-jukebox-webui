@@ -15,6 +15,9 @@ export interface ShellValue {
   nameOf: (id: string, snapshot?: string) => string;
   joinRoom: (roomId: string, password?: string) => Promise<JoinResult>;
   leaveRoom: () => Promise<void>;
+  /** 全屏播放器开合（桌面/移动壳与深链入口共用的一次性会话状态） */
+  fullscreenOpen: boolean;
+  setFullscreenOpen: (open: boolean) => void;
   /**
    * 右面板槽位（桌面壳）：Now Playing 是常驻默认态，queue/rooms 打开时原位
    * 叠加，关闭即回到 Now Playing。移动壳不渲染槽位，但 queue/rooms 派生态

@@ -114,10 +114,17 @@ export function positionOf(playback: Playback): number {
 export function PlayerBar(): JSX.Element {
   const { t } = useTranslation();
   const state = useRoomState();
-  const { canControl, nameOf, queueOpen, setQueueOpen, setRoomsOpen } = useShell();
+  const {
+    canControl,
+    nameOf,
+    fullscreenOpen,
+    setFullscreenOpen,
+    queueOpen,
+    setQueueOpen,
+    setRoomsOpen,
+  } = useShell();
   const providers = useProviders();
   const { show, showError } = useToast();
-  const [playerOpen, setPlayerOpen] = useState(false);
   // 本会话内已喜欢的 ref 集合（服务端不提供喜欢状态查询，乐观记录）
   const [likedRefs, setLikedRefs] = useState<Set<string>>(() => new Set());
 
@@ -229,7 +236,7 @@ export function PlayerBar(): JSX.Element {
           <div className="flex min-w-0 items-center gap-3">
             <button
               type="button"
-              onClick={() => setPlayerOpen(true)}
+              onClick={() => setFullscreenOpen(true)}
               title={t('room.expand')}
               className="flex-none"
             >
@@ -246,7 +253,7 @@ export function PlayerBar(): JSX.Element {
             <span className="min-w-0">
               <button
                 type="button"
-                onClick={() => setPlayerOpen(true)}
+                onClick={() => setFullscreenOpen(true)}
                 title={t('room.expand')}
                 className="block max-w-full truncate text-left text-[14px] text-paper hover:underline"
               >
@@ -409,13 +416,13 @@ export function PlayerBar(): JSX.Element {
         <RoomSwitcher />
       </div>
 
-      {playerOpen && current && (
+      {fullscreenOpen && current && (
         <FullscreenPlayer
           playback={playback}
           nameOf={nameOf}
           lines={lyrics}
           lyricsLoading={lyricsLoading}
-          onClose={() => setPlayerOpen(false)}
+          onClose={() => setFullscreenOpen(false)}
         />
       )}
     </div>
