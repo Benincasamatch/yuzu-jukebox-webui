@@ -1,12 +1,13 @@
 /**
- * 移动端紧凑播放条（<md）：封面 + 标题/歌手（点击进全屏）+ 个人暂停 + 队列。
- * 底部进度细线；房间级控制（controller）在账户菜单的「切换房间」弹层里。
+ * 移动端紧凑播放条（<md）：封面 + 标题/歌手（点击进全屏）+ 个人暂停 +
+ * controller 切歌 + 队列。底部进度细线；其余房间级控制仍在账户菜单的
+ * 「切换房间」弹层里。
  * 与桌面播放栏共用渲染内核（renderer.pausePersonal/resumePersonal）与五元组时钟。
  */
 import { useEffect, useReducer, useRef, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ListMusic, Pause, Play } from 'lucide-react';
-import { client } from '../app/session';
+import { ListMusic, Pause, Play, SkipForward } from 'lucide-react';
+import { client, roomStore } from '../app/session';
 import { audio, renderer } from '../app/player';
 import { useRoomState } from './hooks';
 import { coverSrc } from './cover';
@@ -14,6 +15,7 @@ import type { Playback } from '../protocol/types';
 import { useLyrics } from './useLyrics';
 import { FullscreenPlayer } from './FullscreenPlayer';
 import { useShell } from './shellContext';
+import { useToast } from './toast';
 
 function positionOf(playback: {
   current: { duration_ms: number } | null;
@@ -34,13 +36,14 @@ export function MobilePlayerBar(): JSX.Element | null {
   const { t } = useTranslation();
   const state = useRoomState();
   const {
+    canControl,
     nameOf,
     fullscreenOpen,
     setFullscreenOpen,
     queueOpen,
     setQueueOpen,
-    setRoomsOpen,
   } = useShell();
+  const { showError } = useToast();
   const [personalPaused, setPersonalPaused] = useState(() => renderer.isPersonalPaused);
   const [, forceTick] = useReducer((x: number) => x + 1, 0);
 
@@ -82,21 +85,7 @@ export function MobilePlayerBar(): JSX.Element | null {
   const shown = current ?? lastCurrentRef.current;
   if (!shown) return null;
 
-  // 未入房：降级为「选择房间」条（点击开房间弹层）
-  if (!state.roomId) {
-    return (
-      <div className="mx-3 mb-2 flex h-14 items-center justify-between gap-3 rounded-lg bg-panel-2 px-3.5 shadow-lg">
-        <span className="truncate text-[12.5px] text-faint">{t('shell.noRoomHint')}</span>
-        <button
-          type="button"
-          onClick={() => setRoomsOpen(true)}
-          className="flex-none rounded-full bg-accent px-4 py-1.5 text-[12.5px] font-medium text-on-accent hover:brightness-105"
-        >
-          {t('shell.selectRoom')}
-        </button>
-      </div>
-    );
-  }
+  if (!state.roomId) return null;
 
   // 入房但无播放内容（且退场动画结束）：不渲染播放条
   if (!rendered) {
@@ -108,7 +97,7 @@ export function MobilePlayerBar(): JSX.Element | null {
 
   return (
     <div
-      className={`miniplayer-enter relative mx-3 mb-2 flex h-14 items-center gap-3 overflow-hidden rounded-lg bg-panel-2 px-3.5 shadow-lg ${
+      className={`miniplayer-enter relative mobile-player mx-3 mb-2 flex h-14 items-center gap-3 overflow-hidden rounded-lg bg-panel-2 px-3.5 shadow-lg ${
         leaving
           ? 'translate-y-full opacity-0 transition-[transform,opacity] duration-[250ms] ease-out'
           : ''
@@ -156,6 +145,16 @@ export function MobilePlayerBar(): JSX.Element | null {
           <Pause className="h-4 w-4 fill-current" />
         )}
       </button>
+      {canControl && (
+        <button
+          type="button"
+          title={t('room.skip')}
+          onClick={() => void roomStore.skip().catch(showError)}
+          className="relative grid h-8 w-8 flex-none place-items-center rounded-full text-muted after:absolute after:-inset-1 after:content-[''] hover:bg-[var(--hover)] hover:text-paper"
+        >
+          <SkipForward className="h-4 w-4 fill-current" />
+        </button>
+      )}
       <button
         type="button"
         title={t('shell.queue')}

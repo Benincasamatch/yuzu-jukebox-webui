@@ -121,7 +121,6 @@ export function PlayerBar(): JSX.Element {
     setFullscreenOpen,
     queueOpen,
     setQueueOpen,
-    setRoomsOpen,
   } = useShell();
   const providers = useProviders();
   const { show, showError } = useToast();
@@ -214,22 +213,15 @@ export function PlayerBar(): JSX.Element {
 
   if (!state.roomId) {
     return (
-      <div className="flex h-18 flex-none items-center justify-between gap-4 bg-transparent px-4">
+      <div className="desktop-player flex h-20 flex-none items-center justify-between gap-4 px-5">
         <span className="text-[13px] text-faint">{t('shell.noRoomHint')}</span>
-        <button
-          type="button"
-          onClick={() => setRoomsOpen(true)}
-          className="rounded-full bg-accent px-5 py-2 text-[13px] font-medium text-on-accent hover:brightness-105"
-        >
-          {t('shell.selectRoom')}
-        </button>
         <RoomSwitcher />
       </div>
     );
   }
 
   return (
-    <div className="grid h-18 flex-none grid-cols-[1fr_minmax(0,1.4fr)_1fr] items-center gap-4 bg-transparent px-4">
+    <div className="desktop-player grid h-20 flex-none grid-cols-[1fr_minmax(0,1.4fr)_1fr] items-center gap-4 px-5">
       {/* 左：当前曲目 */}
       <div className="flex min-w-0 items-center gap-2">
         {current ? (

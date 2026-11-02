@@ -81,6 +81,8 @@ export function createOidcFlow(opts: OidcFlowOptions = {}): OidcFlow {
   return {
     async begin(cfg, beginOpts = {}) {
       const discovery = await discover(cfg.issuer);
+      // Native App 不会随授权跳转重载模块；新流程必须清除上次回调的结果。
+      callbackTask = null;
       const verifier = randomBase64Url();
       const state = randomBase64Url();
       const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));

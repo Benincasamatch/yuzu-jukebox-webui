@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DropdownMenu } from 'radix-ui';
-import { ChevronDown, History, Link as LinkIcon, LogOut, MonitorSpeaker, Server } from 'lucide-react';
+import { ChevronDown, Download, History, Link as LinkIcon, LogOut, MonitorSpeaker, Server } from 'lucide-react';
+import { requestAndroidUpdateCheck } from '../app/androidUpdate';
 import { httpBase } from '../config';
 import { isNativeApp } from '../app/nativemedia';
 import { session } from '../app/session';
@@ -92,6 +93,7 @@ export function AccountMenu({
                 {t('serverPicker.label')}：{serverHost}
               </DropdownMenu.Item>
             )}
+            {isNativeApp && <DropdownMenu.Item className={itemClass} onSelect={requestAndroidUpdateCheck}><Download className="h-3.5 w-3.5" />{t('updates.check')}</DropdownMenu.Item>}
             {themeInMenu && (
               <div className="border-t border-hairline pt-1">
                 <ThemeContent />

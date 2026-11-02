@@ -1,6 +1,5 @@
 /**
- * 全屏沉浸舞台：浏览器即画布。静态背景（深压虚化封面底 + 双极光团 +
- * 均一暗纱 + 暗角）由封面取色驱动；桌面端封面静止陈列，
+ * 全屏沉浸舞台：浏览器即画布。静态渐变背景由封面取色驱动；桌面端封面静止陈列，
  * chrome（关闭/点播者/时间）在活动后 2.8s 自动隐去（连同光标），底部通栏
  * 发丝进度线贯穿视口。播放位置永远由服务端五元组推算，无任何本地进度状态。
  * 纯观赏视图：桌面端无任何控制按钮（控制在 PlayerBar），歌词手动滚动
@@ -15,7 +14,8 @@ import { audio, renderer } from '../app/player';
 import type { Playback } from '../protocol/types';
 import type { LyricLine } from '../player/lyrics';
 import { activeLineIndex } from '../player/lyrics';
-import { extractGlowColors } from './glow';
+import { useCoverColor } from './useCoverColor';
+import { useMediaQuery } from './hooks';
 import { ArtistLinks } from './artist';
 import { coverSrc, originalCoverSrc } from './cover';
 import { SimilarButton } from './SimilarButton';
@@ -37,7 +37,17 @@ export function FullscreenPlayer(props: {
   const current = playback.current!; // 挂载方保证 current 非空
 
   const [, forceTick] = useReducer((x: number) => x + 1, 0);
-  const [glow, setGlow] = useState<[string, string] | null>(null);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [contentReady, setContentReady] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // Keep image decoding, color sampling and the lyrics tree out of the entrance animation.
+  useEffect(() => {
+    if (contentReady) return;
+    const timer = window.setTimeout(() => setContentReady(true), 320);
+    return () => window.clearTimeout(timer);
+  }, [contentReady]);
+  const glow = useCoverColor(contentReady && current.cover_url ? coverSrc(current.cover_url) : undefined, current.track_ref);
+  const stageCover = current.cover_url ? (contentReady ? originalCoverSrc(current.cover_url) : coverSrc(current.cover_url)) : undefined;
+  const closeTimerRef = useRef<number | null>(null);
   // 移动端视图：封面 ↔ 歌词（点击切换）。everSwitched：首挂载时非活动视图
   // 用静态 view-hidden（0 透明度），避免 view-leave 动画从 1 起步闪一帧
   const [view, setView] = useState<'cover' | 'lyrics'>('cover');
@@ -51,11 +61,15 @@ export function FullscreenPlayer(props: {
   const idleTimerRef = useRef<number | null>(null);
   // 退出动画：先滑下再卸载（280ms 与 CSS transition 对齐）
   const [closing, setClosing] = useState(false);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const closingRef = useRef(false);
   const closePlayer = useCallback(() => {
-    if (closing) return;
+    if (closingRef.current) return;
+    closingRef.current = true;
     setClosing(true);
-    window.setTimeout(onClose, 280);
-  }, [closing, onClose]);
+    closeTimerRef.current = window.setTimeout(() => onCloseRef.current(), 280);
+  }, []);
 
   const wake = useCallback(() => {
     setChromeVisible(true);
@@ -84,17 +98,20 @@ export function FullscreenPlayer(props: {
     }
     pushOverlayCloser('fullscreen-player', closePlayer);
     wake();
-    const idle = idleTimerRef.current;
     return () => {
       clearInterval(id);
-      if (idle !== null) window.clearTimeout(idle);
+      if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current);
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
       for (const m of scrollLocks) m.style.overflow = '';
       removeOverlayCloser('fullscreen-player');
     };
-  }, [closePlayer, onClose, wake]);
+  }, [closePlayer, wake]);
+
+  useEffect(() => () => {
+    if (closeTimerRef.current !== null) window.clearTimeout(closeTimerRef.current);
+  }, []);
 
   // 起播提前量窗口内推算值为负（本曲还没开始）：钳到 0 再拿去渲染进度条/时间/歌词。
   // 个人暂停时显示本地停住位置（房间仍在播）。
@@ -108,17 +125,12 @@ export function FullscreenPlayer(props: {
   );
   const pct = current.duration_ms > 0 ? (pos / current.duration_ms) * 100 : 0;
 
-  const grabGlow = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const colors = extractGlowColors(e.currentTarget);
-    if (colors) setGlow(colors);
-  };
-
   const chromeFade = `transition-opacity duration-500 ${
     chromeVisible ? 'opacity-100' : 'pointer-events-none opacity-0'
   }`;
 
   const lyricsBlock = (align: 'center' | 'left') =>
-    lyricsLoading || lines === null ? (
+    !contentReady || lyricsLoading || lines === null ? (
       <p className="pt-24 text-center text-sm text-faint">{t('lyrics.loading')}</p>
     ) : (
       <LyricsPanel
@@ -130,51 +142,11 @@ export function FullscreenPlayer(props: {
       />
     );
 
-  // 四层舞台背景：深压的虚化封面 → 克制的双极光团 → 均一暗纱 → 暗角。
-  // 干净的关键：环境整体压到近黑，封面色以「黑上的染色」存在，而非中灰泥浆。
+  // Soft radial falloffs are already smooth: no full-viewport blur surfaces or image copies.
   const backdrop = (
-    <>
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          backgroundImage: current.cover_url ? `url(${coverSrc(current.cover_url)})` : undefined,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(140px) saturate(1.2) brightness(0.32)',
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background: `radial-gradient(52% 58% at 28% 38%, ${glow?.[0] ?? '#3A4A2E'} 0%, transparent 72%)`,
-          opacity: 'calc(var(--glow-opacity) * 0.55)',
-          filter: 'blur(90px)',
-          transition: 'background 600ms ease',
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background: `radial-gradient(48% 54% at 74% 66%, ${glow?.[1] ?? '#2E4258'} 0%, transparent 72%)`,
-          opacity: 'calc(var(--glow-opacity) * 0.45)',
-          filter: 'blur(100px)',
-          transition: 'background 600ms ease',
-        }}
-      />
-      {/* 均一暗纱：把封面底与极光团统一压暗，文字对比度的地基 */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 bg-black/45" />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-0"
-        style={{
-          background:
-            'radial-gradient(120% 90% at 50% 42%, transparent 50%, rgba(0,0,0,0.5) 100%)',
-        }}
-      />
-    </>
+    <div aria-hidden="true" className="fullscreen-backdrop" style={{
+      backgroundImage: `radial-gradient(ellipse at 22% 30%, ${glow ?? 'var(--fullscreen-ambient-a)'} 0%, transparent 68%), radial-gradient(ellipse at 82% 74%, var(--fullscreen-ambient-b) 0%, transparent 70%)`,
+    }} />
   );
 
   const personalPauseButton = (
@@ -199,19 +171,16 @@ export function FullscreenPlayer(props: {
     </button>
   );
 
-  // portal 到 body：任何祖先的 transform/filter/动画都不能影响 fixed 覆盖定位。
-  // 外层保持无 transform + overflow-hidden：进场动画若留在外层，fill forwards 会
-  // 永久保留 transform，使辉光等 fixed 子层变成相对外层定位并计入滚动溢出区
-  // （26s/34s 漂移 scale 撑出四面滚动区，玩家看似缓慢向右下伸展）。动画移到内层。
+  // Portal keeps the overlay independent of shell transforms. Only the content moves;
+  // the ambient layer stays still, and the compositor hint is removed after entry.
   return createPortal(
     <div
-      className={`fixed inset-0 z-50 overflow-hidden ${chromeVisible ? '' : 'cursor-none'}`}
+      className={`fullscreen-player fixed inset-0 z-50 overflow-hidden ${chromeVisible ? '' : 'cursor-none'}`}
+      role="dialog" aria-modal="true" aria-label={t('room.expand')}
       onPointerMove={wake}
     >
-      {/* bg-hall 挂内层：外层无背景，整体（背景+内容）随动画一起下进下出，
-          而不是背景先覆盖、内容再滑入 */}
-      <div className={`h-full w-full bg-hall ${closing ? 'fullscreen-exit' : 'fullscreen-enter'}`}>
-        {backdrop}
+      {backdrop}
+      <div className={`fullscreen-content h-full w-full ${closing ? 'fullscreen-exit' : !contentReady ? 'fullscreen-enter' : ''}`}>
 
       <button
         onClick={closePlayer}
@@ -222,7 +191,7 @@ export function FullscreenPlayer(props: {
       </button>
 
       {/* 移动端：封面/歌词单视图切换（crossfade，点击互切）。 */}
-      <div className="relative mx-auto h-dvh max-w-md px-6 landscape:max-w-2xl lg:hidden">
+      {!isDesktop && <div className="relative mx-auto h-dvh max-w-md px-6 landscape:max-w-2xl">
         <div
           role="button"
           tabIndex={0}
@@ -243,9 +212,9 @@ export function FullscreenPlayer(props: {
             <div className="flex min-h-0 flex-1 flex-col items-center justify-center">
               {current.cover_url ? (
                 <img
-                  src={originalCoverSrc(current.cover_url)}
+                  src={stageCover}
                   alt=""
-                  onLoad={grabGlow}
+                  decoding="async"
                   className="aspect-square w-56 rounded-xl object-cover landscape:w-32 sm:w-64 sm:landscape:w-40"
                   style={{ boxShadow: 'var(--cover-shadow)' }}
                 />
@@ -305,18 +274,18 @@ export function FullscreenPlayer(props: {
             view === 'lyrics' ? 'fs-view-enter' : everSwitched ? 'fs-view-leave' : 'fs-view-hidden'
           }`}
         >
-          <div className="h-full px-2 py-12">{lyricsBlock('center')}</div>
+          {view === 'lyrics' || everSwitched ? <div className="h-full px-2 py-12">{lyricsBlock('center')}</div> : null}
         </div>
-      </div>
+      </div>}
 
       {/* 桌面舞台：左封面/信息（按视口高度定尺寸，静止陈列），右歌词占满余宽 */}
-      <div className="relative hidden h-dvh items-center gap-[5vw] px-[7vw] lg:flex">
+      {isDesktop && <div className="relative flex h-dvh items-center gap-[5vw] px-[7vw]">
         <div className="w-[min(30vw,58vh)] flex-none">
           {current.cover_url ? (
             <img
-              src={originalCoverSrc(current.cover_url)}
+              src={stageCover}
               alt=""
-              onLoad={grabGlow}
+              decoding="async"
               className="aspect-square w-full rounded-lg object-cover"
               style={{ boxShadow: 'var(--cover-shadow)' }}
             />
@@ -351,7 +320,7 @@ export function FullscreenPlayer(props: {
 
         {/* 右区：歌词（左对齐大字级，占满余宽消灭中部留白） */}
         <div className="h-[86vh] min-w-0 flex-1">{lyricsBlock('left')}</div>
-      </div>
+      </div>}
 
       {/* 底部通栏发丝进度线：贯穿视口，白色半透明、不随主题色、不挂数显（桌面） */}
       <div className="pointer-events-none fixed inset-x-0 bottom-0 hidden lg:block">

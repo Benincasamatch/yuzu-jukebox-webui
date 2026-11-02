@@ -17,7 +17,7 @@ export type Role =
   | 'media_admin'
   | (string & {});
 
-export type IdentityKind = 'guest' | 'password' | 'oidc' | 'player';
+export type IdentityKind = 'guest' | 'password' | 'oidc' | 'unified' | 'player';
 
 export interface Identity {
   id: string;
@@ -67,6 +67,11 @@ export type QueueEntry = TrackMeta;
 
 export interface Playback {
   current: CurrentTrack | null;
+  /**
+   * 支持同步起播的本地 Player 正在预载。此时 current/stream_url 已可用，
+   * 但房间时间线尚未开始；客户端应加载并保持静音，等待下一条 playing 状态。
+   */
+  preparing?: boolean;
   /**
    * 可以为负：切歌时服务端把新曲目的 position 0 排在未来
    * 「updated_at + |position_ms|」时刻（起播提前量，房间 policy `start_lead_ms`，

@@ -25,6 +25,12 @@ function resolveStreamUrl(streamUrl: string): string {
   return `${normalizedHttpBase}/${streamUrl.replace(/^\//, '')}`;
 }
 
+export interface PersonalPlaybackOptions {
+  initiallyPaused?: boolean;
+  preserveAcrossRooms?: boolean;
+  onChange?: (paused: boolean) => void;
+}
+
 export class AudioRenderer {
   private playback: Playback | null = null;
   private loadedTrackRef: string | null = null;
@@ -43,7 +49,9 @@ export class AudioRenderer {
     private readonly audio: HTMLAudioElement,
     private readonly clock: ClockSync,
     private readonly corrector = new DriftCorrector(),
+    private readonly personalOptions: PersonalPlaybackOptions = {},
   ) {
+    this.personalPaused = personalOptions.initiallyPaused ?? false;
     this.audio.addEventListener('error', () => {
       this.mediaFailed = true;
     });
@@ -84,8 +92,11 @@ export class AudioRenderer {
     this.playback = playback;
 
     if (current === null) {
-      // 离房/停止：个人暂停随房间语境一并清除，换房后默认重新跟随。
-      this.personalPaused = false;
+      // Browser opt-in is a persistent preference; native/default callers keep reset semantics.
+      if (!this.personalOptions.preserveAcrossRooms && this.personalPaused) {
+        this.personalPaused = false;
+        this.personalOptions.onChange?.(false);
+      }
       this.cancelPendingReadyHandler();
       this.loadedTrackRef = null;
       this.loadedStreamUrl = null;
@@ -221,6 +232,7 @@ export class AudioRenderer {
       return;
     }
     this.personalPaused = true;
+    this.personalOptions.onChange?.(true);
     this.cancelStartTimer();
     this.audio.pause();
   }
@@ -236,6 +248,7 @@ export class AudioRenderer {
       return;
     }
     this.personalPaused = false;
+    this.personalOptions.onChange?.(false);
     const playback = this.playback;
     const current = playback?.current;
     if (!playback || !current || playback.playing === false) {

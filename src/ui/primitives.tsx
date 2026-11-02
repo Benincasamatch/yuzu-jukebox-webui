@@ -1,6 +1,6 @@
 /**
  * Radix primitives 的 token 化封装——无障碍（焦点陷阱/键盘导航/ARIA）由 radix 保证，
- * 视觉全部走设计 token（bg-panel-2 / border-hairline / 无阴影 / --radius）。
+ * 视觉走语义 token，弹窗使用 material-dialog 的材质、圆角与阴影。
  */
 import { Dialog as DialogPrimitive, Select as SelectPrimitive, Tabs as TabsPrimitive } from 'radix-ui';
 import type { ReactNode } from 'react';
@@ -23,7 +23,7 @@ export function ConfirmDialog(props: {
     <DialogPrimitive.Root open={props.open} onOpenChange={props.onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60" />
-        <DialogPrimitive.Content className="pop-enter fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(92vw,380px)] bg-panel-2 border border-hairline rounded-lg p-6">
+        <DialogPrimitive.Content className="material-dialog pop-enter fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[min(92vw,380px)] bg-panel-2 border border-hairline rounded-lg p-6">
           <DialogPrimitive.Title className="font-display text-lg font-semibold">
             {props.title}
           </DialogPrimitive.Title>
@@ -73,7 +73,7 @@ export function Dialog(props: {
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/60" />
         <DialogPrimitive.Content
-          className={`pop-enter fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${width} max-h-[85vh] overflow-y-auto bg-panel-2 border border-hairline rounded-lg p-6`}
+          className={`material-dialog pop-enter fixed z-50 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 ${width} max-h-[85vh] overflow-y-auto bg-panel-2 border border-hairline rounded-lg p-6`}
         >
           <DialogPrimitive.Title className="font-display text-lg font-semibold mb-4">
             {props.title}

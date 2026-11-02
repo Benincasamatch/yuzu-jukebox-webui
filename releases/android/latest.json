@@ -1,0 +1,8 @@
+{
+  "packageId": "dev.uwen.yuzujukebox",
+  "versionCode": 10201,
+  "versionName": "1.2.1",
+  "apkUrl": "https://music.102.yuna.team/app-updates/yuzu-jukebox-1.2.1.apk",
+  "sha256": "c14a4ad9765050f385556841b5f5767543644f2ed799b14a70f3d8f59f3f71f9",
+  "notes": "搜索来源改为网易云音乐、QQ 音乐、哔哩哔哩图标与中文名称；local 更名为本地媒体；搜索聚焦时顶部栏自然展开、文字提亮，并以圆角矩形强调来源。"
+}

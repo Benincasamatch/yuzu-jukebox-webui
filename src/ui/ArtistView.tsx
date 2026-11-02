@@ -20,6 +20,7 @@ import type { SearchEntity, SearchTrack } from '../api/types';
 import { api } from '../app/session';
 import { coverSrc, originalCoverSrc } from './cover';
 import { TrackList, searchTrackToRow, useEnqueue } from './TrackList';
+import { AlbumPlayControls } from './AlbumPlayControls';
 import { useCoverColor } from './useCoverColor';
 import { useProviders } from './hooks';
 import { useToast } from './toast';
@@ -254,6 +255,14 @@ export default function ArtistView(): JSX.Element {
               {drill.album.name ?? t('artistPage.back')}
             </button>
             <h2 className="mb-4 text-2xl font-bold text-paper">{t('artistPage.albumTracks')}</h2>
+            {providerId && drill.album.entity_id && (
+              <AlbumPlayControls
+                key={`${providerId}:${drill.album.entity_id}`}
+                provider={providerId}
+                albumId={drill.album.entity_id}
+                disabled={drill.tracks.length === 0}
+              />
+            )}
             <TrackList tracks={drill.tracks.map(searchTrackToRow)} />
           </section>
         ) : (

@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { roomStore } from '../../app/session';
 import { useRoomState } from '../hooks';
 import { useShell } from '../AppShell';
+import { isVisibleRadioSource } from '../radioSources';
 import { useToast } from '../toast';
 
 export function RadioPanel(): JSX.Element | null {
@@ -35,7 +36,7 @@ export function RadioPanel(): JSX.Element | null {
       <div className="flex items-center gap-2 text-[12.5px]">
         <span className="h-1.5 w-1.5 flex-none animate-pulse rounded-full bg-accent" />
         <span className="min-w-0 truncate font-mono text-xs text-muted">
-          {t('room.radioOn', { source: radio.source })}
+          {isVisibleRadioSource(radio.source) ? t('room.radioOn', { source: radio.source }) : t('radio.active')}
         </span>
         {canRadio && (
           <button

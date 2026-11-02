@@ -1,6 +1,7 @@
+import { ProviderLabel } from './ProviderLabel';
 /**
- * 桌面播放器外壳（Spotify 三栏）：左曲库栏、主面板（顶栏 sticky + 内容）、
- * 右 Now Playing 栏、底部播放栏、队列抽屉。面板以黑色缝隙分隔，无 border。
+ * 桌面播放器外壳（Apple HIG 风格的三栏）：左曲库栏、主面板（顶栏 sticky + 内容）、
+ * 右 Now Playing 栏、底部播放栏、队列抽屉。面板以细线分隔，底部播放栏使用材质背景。
  * 壳状态（房间动作/播放授权/播放接线）抽到 shell/state.ts，与移动壳共用；
  * 房间从「页面」降级为「状态」——播放接线常驻，页面切换不影响出声。
  */
@@ -8,9 +9,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { DropdownMenu } from 'radix-ui';
-import { Check, ChevronDown, ChevronLeft, Home, Search as SearchIcon, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronLeft, Home, Music2, Search as SearchIcon, X } from 'lucide-react';
 import { api } from '../app/session';
 import { useConnStatus, useIdentity } from './hooks';
+import { AppDownloadLink } from './AppDownloadLink';
 import { AccountMenu } from './AccountMenu';
 import { BatteryOptBanner } from './BatteryOptBanner';
 import ThemeControls from './ThemeControls';
@@ -52,7 +54,7 @@ export default function AppShell() {
 
   return (
     <ShellContext.Provider value={value}>
-      <div className="flex h-dvh flex-col gap-2 bg-hall p-2">
+      <div className="app-desktop flex h-dvh flex-col bg-hall">
         {(status === 'reconnecting' || status === 'offline') && (
           <div className="flex-none rounded-lg bg-accent-soft py-1.5 text-center text-sm text-accent">
             {t(status === 'offline' ? 'conn.offline' : 'conn.reconnecting')}
@@ -61,7 +63,7 @@ export default function AppShell() {
 
         <TopBar />
 
-        <div className="flex min-h-0 flex-1">
+        <div className="workspace flex min-h-0 flex-1">
           <div className="h-full flex-none max-lg:hidden" style={{ width: railW }}>
             <LibraryRail />
           </div>
@@ -72,7 +74,7 @@ export default function AppShell() {
             onDrag={(dx) => setRailW(clamp(capturedRailW.current + dx, RAIL_MIN, RAIL_MAX))}
             onEnd={() => localStorage.setItem(RAIL_W_KEY, String(railW))}
           />
-          <main className="min-w-0 flex-1 overflow-y-auto rounded-lg bg-panel">
+          <main className="content-panel min-w-0 flex-1 overflow-y-auto bg-panel">
             <Outlet />
           </main>
           {value.rightPanel !== 'nowPlaying' || !value.nowPlayingCollapsed ? (
@@ -90,7 +92,7 @@ export default function AppShell() {
           )}
           {value.rightPanel === 'queue' && (
             <aside
-              className="flex-none overflow-hidden rounded-lg bg-panel max-lg:hidden"
+              className="inspector-panel flex-none overflow-hidden bg-panel max-lg:hidden"
               style={{ width: panelW }}
             >
               <QueuePanelContent onClose={() => value.setRightPanel('nowPlaying')} />
@@ -98,7 +100,7 @@ export default function AppShell() {
           )}
           {value.rightPanel === 'rooms' && (
             <aside
-              className="flex-none overflow-hidden rounded-lg bg-panel max-lg:hidden"
+              className="inspector-panel flex-none overflow-hidden bg-panel max-lg:hidden"
               style={{ width: panelW }}
             >
               <RoomsPanel onClose={() => value.setRightPanel('nowPlaying')} />
@@ -109,7 +111,7 @@ export default function AppShell() {
               <CollapsedNowPlaying onExpand={() => value.setNowPlayingOpen(true)} />
             ) : (
               <aside
-                className="flex-none overflow-hidden rounded-lg bg-panel max-lg:hidden"
+                className="inspector-panel flex-none overflow-hidden bg-panel max-lg:hidden"
                 style={{ width: panelW }}
               >
                 <NowPlayingPanel />
@@ -165,10 +167,11 @@ function TopBar() {
   };
 
   return (
-    <header className="flex flex-none items-center gap-4 py-2">
-      {/* 左：品牌文字占位（Spotify logo 位），与左曲库栏同宽对齐 */}
-      <NavLink to="/" className="flex w-72 flex-none items-center pl-2">
-        <span className="text-lg font-bold tracking-tight text-paper">
+    <header className="app-toolbar flex flex-none items-center gap-4 px-5 py-3">
+      {/* 左：应用品牌与音乐图标 */}
+      <NavLink to="/" className="app-brand flex w-60 flex-none items-center gap-2.5">
+        <span aria-hidden="true" className="brand-icon"><Music2 className="h-5 w-5" /></span>
+        <span className="text-lg font-semibold tracking-tight text-paper">
           Yuzu <span className="text-accent">Jukebox</span>
         </span>
       </NavLink>
@@ -183,7 +186,7 @@ function TopBar() {
           <Home className="h-5 w-5" />
         </NavLink>
         <form
-          className="flex h-10 w-full max-w-[480px] items-center rounded-full bg-panel transition-shadow focus-within:ring-2 focus-within:ring-paper hover:ring-1 hover:ring-hairline"
+          className="toolbar-search flex w-full items-center rounded-xl border border-hairline bg-panel"
           onSubmit={(event) => {
             event.preventDefault();
             goSearch(keyword.trim(), provider);
@@ -194,9 +197,9 @@ function TopBar() {
               <button
                 type="button"
                 title={t('searchPage.providerPick')}
-                className="flex flex-none items-center gap-1 rounded-l-full py-1.5 pr-2 pl-3.5 font-mono text-[12px] text-muted hover:text-paper"
+                className="search-provider flex flex-none items-center gap-1.5 text-[12px]"
               >
-                {provider}
+                <ProviderLabel provider={provider} />
                 <ChevronDown className="h-3 w-3 text-faint" />
               </button>
             </DropdownMenu.Trigger>
@@ -210,28 +213,29 @@ function TopBar() {
                   <DropdownMenu.Item
                     key={id}
                     onSelect={() => changeProvider(id)}
-                    className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2 font-mono text-[12.5px] text-muted outline-none data-[highlighted]:bg-[var(--hover)] data-[highlighted]:text-paper"
+                    className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2 text-[12.5px] text-muted outline-none data-[highlighted]:bg-[var(--hover)] data-[highlighted]:text-paper"
                   >
-                    {id}
+                    <ProviderLabel provider={id} />
                     {id === provider && <Check className="h-3.5 w-3.5 text-accent" />}
                   </DropdownMenu.Item>
                 ))}
               </DropdownMenu.Content>
             </DropdownMenu.Portal>
           </DropdownMenu.Root>
-          <span className="h-4 w-px flex-none bg-hairline" />
-          <SearchIcon className="pointer-events-none ml-2.5 h-4 w-4 flex-none text-faint" />
+          <SearchIcon className="search-symbol pointer-events-none ml-2.5 h-4 w-4 flex-none" />
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
+            aria-label={t('search.placeholder')}
             placeholder={t('search.placeholder')}
-            className="search-input w-full min-w-0 bg-transparent py-1.5 pr-3 pl-2 text-[13.5px] placeholder:text-faint focus:outline-none"
+            className="search-input w-full min-w-0 bg-transparent py-1.5 pr-3 pl-2 text-[13.5px] focus:outline-none"
           />
         </form>
       </div>
 
-      {/* 右：管理 / 主题 / 账户（Spotify 同款：账户只露头像） */}
-      <div className="flex w-72 flex-none items-center justify-end gap-3 pr-2">
+      {/* 右：管理 / 主题 / 账户 */}
+      <div className="toolbar-actions flex w-60 flex-none items-center justify-end gap-3">
+        <AppDownloadLink />
         <AdminEntry />
         <ThemeControls />
         <AccountMenu compact />
@@ -241,7 +245,7 @@ function TopBar() {
 }
 
 /**
- * 栏间分界线（桌面）：8px 黑缝即拖拽热区，hover/drag 亮起中线；
+ * 栏间分界线（桌面）：5px 栏间拖拽热区，hover/drag 亮起中线；
  * pointer capture 拖动，增量经 onDrag 上报（钳制与持久化由调用方负责）。
  */
 function ColumnDivider({

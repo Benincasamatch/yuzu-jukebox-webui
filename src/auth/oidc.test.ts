@@ -234,4 +234,32 @@ describe('OIDC Authorization Code + PKCE flow', () => {
     await expect(flow.handleCallback('https://app.example/lobby?room=main')).resolves.toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it('exchanges a new code when native login is repeated without reloading the app', async () => {
+    const storage = new MemoryStorage();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).endsWith('/.well-known/openid-configuration')) {
+        return new Response(JSON.stringify({
+          authorization_endpoint: 'https://idp.example/authorize',
+          token_endpoint: 'https://idp.example/token',
+        }));
+      }
+      const code = new URLSearchParams(String(init?.body)).get('code');
+      return new Response(JSON.stringify({ id_token: `token-${code}` }));
+    });
+    const flow = createOidcFlow({
+      storage,
+      fetchFn: fetchMock as typeof fetch,
+      openAuthPage: vi.fn(),
+      resolveRedirectUri: () => 'yuzu-jukebox://oauth',
+    });
+
+    for (const code of ['first', 'second']) {
+      await flow.begin(config);
+      const state = storage.getItem('yuzu-oidc-state');
+      await expect(flow.handleCallback(`yuzu-jukebox://oauth?code=${code}&state=${state}`))
+        .resolves.toEqual({ idToken: `token-${code}` });
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });

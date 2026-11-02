@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Moon, Palette, Sun } from 'lucide-react';
+import { applySkin } from '../app/skin';
+import { useSkin } from './useSkin';
+import { VampireCrest } from './ScarletSkin';
 import { applyAccent, applyScheme, currentAccent, currentScheme } from '../app/theme';
 
 const PRESETS: Array<[string, string]> = [
@@ -16,11 +19,13 @@ const PRESETS: Array<[string, string]> = [
 /** 主题内容（桌面 Popover 与移动账户菜单共用）：深浅切换 + 预设色 + 自定义色。 */
 export function ThemeContent() {
   const { t } = useTranslation();
+  const { skin } = useSkin();
   const [scheme, setScheme] = useState(currentScheme());
   const [accent, setAccent] = useState(currentAccent());
   return (
     <div>
       <button
+        disabled={skin === 'scarlet'}
         type="button"
         onClick={() => {
           const next = scheme === 'dark' ? 'light' : 'dark';
@@ -32,7 +37,7 @@ export function ThemeContent() {
         <span>{t('theme.switchScheme')}</span>
         {scheme === 'dark' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
       </button>
-      <div className="flex items-center gap-2.5 border-t border-hairline px-2.5 py-2.5">
+      <fieldset disabled={skin === 'scarlet'} aria-label={t('theme.accent')} className="theme-accent-grid border-t border-hairline px-2.5 py-2.5 disabled:opacity-40">
         {PRESETS.map(([name, hex]) => (
           <button
             key={hex}
@@ -61,6 +66,15 @@ export function ThemeContent() {
           />
           <Palette className="h-3.5 w-3.5" />
         </label>
+      </fieldset>
+      <div className="skin-chooser">
+        <span className="skin-chooser-label">{t('scarlet.easterEgg')}</span>
+        <button type="button" className="scarlet-choice" aria-pressed={skin === 'scarlet'} onClick={() => applySkin(skin === 'scarlet' ? 'default' : 'scarlet')}>
+          <VampireCrest className="skin-choice-crest" />
+          <span><strong>{t('scarlet.skin')}</strong><small>{t(skin === 'scarlet' ? 'scarlet.returnDefault' : 'scarlet.skinNote')}</small></span>
+          <span className="skin-choice-dot" aria-hidden="true" />
+        </button>
+        {skin === 'scarlet' && <p className="skin-palette-note">{t('scarlet.nightPalette')}</p>}
       </div>
     </div>
   );

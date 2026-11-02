@@ -6,6 +6,7 @@ import { useEffect, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { RadioCatalogEntry } from '../api/types';
 import { api } from '../app/session';
+import { isVisibleRadioSource } from './radioSources';
 import { ChartCard } from './ChartCard';
 import { useProviders } from './hooks';
 import { useToast } from './toast';
@@ -24,7 +25,7 @@ export default function ChartsView(): JSX.Element {
     api
       .radioCatalogAll()
       .then((rows) => {
-        if (!dead) setEntries(rows);
+        if (!dead) setEntries(rows.filter((entry) => isVisibleRadioSource(entry.spec)));
       })
       .catch((error: unknown) => {
         if (dead) return;

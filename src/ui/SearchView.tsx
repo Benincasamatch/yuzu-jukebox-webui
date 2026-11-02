@@ -1,3 +1,4 @@
+import { ProviderLabel } from './ProviderLabel';
 /**
  * 搜索页：顶栏搜索框的落点。URL 驱动（?q= &p=），无独立导航入口。
  * 分类 chips 由 provider 的 capabilities.search_categories 驱动——
@@ -93,7 +94,7 @@ export default function SearchView(): JSX.Element {
       {/* 移动端输入框：顶栏搜索 icon 跳转到这里，页面自带输入（桌面端用顶栏输入框）。
           provider 切换折叠在框内左侧（与桌面顶栏同一交互） */}
       <form
-        className="mb-5 flex items-center gap-2 rounded-full border border-hairline bg-panel px-3.5 py-2 md:hidden"
+        className="mobile-search mb-5 flex items-center gap-2 rounded-xl border border-hairline bg-panel p-1.5 md:hidden"
         onSubmit={(event) => {
           event.preventDefault();
           const q = mobileKeyword.trim();
@@ -107,9 +108,9 @@ export default function SearchView(): JSX.Element {
                 <button
                   type="button"
                   title={t('searchPage.providerPick')}
-                  className="flex flex-none items-center gap-1 font-mono text-[12px] text-muted hover:text-paper"
+                  className="search-provider flex flex-none items-center gap-1.5 text-[12px]"
                 >
-                  {provider}
+                  <ProviderLabel provider={provider} />
                   <ChevronDown className="h-3 w-3 text-faint" />
                 </button>
               </DropdownMenu.Trigger>
@@ -130,9 +131,9 @@ export default function SearchView(): JSX.Element {
                             : `/search?p=${encodeURIComponent(item.id)}`,
                         );
                       }}
-                      className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2 font-mono text-[12.5px] text-muted outline-none data-[highlighted]:bg-[var(--hover)] data-[highlighted]:text-paper"
+                      className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2.5 py-2 text-[12.5px] text-muted outline-none data-[highlighted]:bg-[var(--hover)] data-[highlighted]:text-paper"
                     >
-                      {item.id}
+                      <ProviderLabel provider={item.id} />
                       {item.id === provider && <Check className="h-3.5 w-3.5 text-accent" />}
                     </DropdownMenu.Item>
                   ))}

@@ -6,6 +6,7 @@
  * config.js 在 index.html 中先于模块脚本执行，此处可直接读全局值。
  */
 import { Capacitor } from '@capacitor/core';
+import { resolveServerAddress } from './serverAddress';
 
 /** 原生 App 内用户自选服务端的 localStorage key；仅原生平台生效。 */
 export const NATIVE_SERVER_KEY = 'yuzu-server';
@@ -16,6 +17,8 @@ interface YuzuRuntimeConfig {
   title?: string;
   favicon?: string;
   accent?: string;
+  android_update_url?: string;
+  android_download_url?: string;
   scheme?: 'dark' | 'light' | '';
   /** true only when server config.admin_password is non-empty. */
   admin_password_enabled?: boolean;
@@ -34,12 +37,13 @@ const nativeOverride = Capacitor.isNativePlatform()
   ? (localStorage.getItem(NATIVE_SERVER_KEY) ?? '').replace(/\/$/, '')
   : '';
 
-const configured = (
-  nativeOverride ||
-  runtime.server ||
-  (import.meta.env.VITE_YUZU_SERVER as string | undefined) ||
-  ''
-).replace(/\/$/, '');
+const serverOptions = {
+  native: Capacitor.isNativePlatform(),
+  runtime: runtime.server,
+  build: import.meta.env.VITE_YUZU_SERVER as string | undefined,
+};
+export const defaultHttpBase = resolveServerAddress(serverOptions);
+const configured = resolveServerAddress({ ...serverOptions, override: nativeOverride });
 
 /** REST/流式端点基址；同源时为空串，直接拼路径即可。 */
 export const httpBase: string = configured;
@@ -62,7 +66,7 @@ export const pageTitle: string = runtime.title || 'Yuzu Jukebox';
 export const faviconUrl: string = runtime.favicon || 'favicon.svg';
 
 /** 默认主题色（用户本机选择优先于它）。 */
-export const defaultAccent: string = runtime.accent || '#1DB954';
+export const defaultAccent: string = runtime.accent || '#D92D48';
 
 /** 配置指定的默认深浅色；'' = 内置默认深色（用户本机锁定优先；不跟随系统）。 */
 export const configuredScheme: 'dark' | 'light' | '' = runtime.scheme ?? '';
@@ -72,3 +76,7 @@ export const configuredScheme: 'dark' | 'light' | '' = runtime.scheme ?? '';
  * empty server value disables elevation, so the WebUI hides the input.
  */
 export const adminPasswordEnabled: boolean = runtime.admin_password_enabled === true;
+
+/** Stable app distribution endpoints, independent of the currently selected music server. */
+export const androidUpdateUrl = runtime.android_update_url || 'https://music.102.yuna.team/app-updates/latest.json';
+export const androidDownloadUrl = runtime.android_download_url || new URL('latest.apk', androidUpdateUrl).href;

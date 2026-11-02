@@ -1,22 +1,23 @@
 /**
  * 主题运行时：scheme（深/浅）与 accent（主题色）两条用户轴。
- * 与 design/mockup.html 的机制一致：只写 CSS 变量，组件无感知。
+ * 运行时只写 CSS 变量，组件通过语义 token 取色。
  */
 
 import { defaultAccent } from '../config';
 import { syncSystemBars } from './nativeui';
+import { currentSkin, initSkin } from './skin';
 
 export type Scheme = 'dark' | 'light';
 
 const ACCENT_KEY = 'yuzu-accent';
 const SCHEME_KEY = 'yuzu-scheme';
 
-/** accent 上的可读文字色（YIQ 亮度判定；阈值 120 使 #1DB954 绿落到深色文字，与 Spotify 一致） */
+/** accent 上的可读文字色（YIQ 亮度判定；浅亮强调色使用深色文字） */
 function onAccentFor(hex: string): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
-  return (r * 299 + g * 587 + b * 114) / 1000 >= 120 ? '#0A1F10' : '#F5F2EC';
+  return (r * 299 + g * 587 + b * 114) / 1000 >= 120 ? '#151517' : '#FFFFFF';
 }
 
 export function applyAccent(hex: string, persist = true): void {
@@ -31,7 +32,7 @@ export function applyAccent(hex: string, persist = true): void {
 
 export function applyScheme(scheme: Scheme, persist = true): void {
   document.documentElement.dataset.scheme = scheme;
-  syncSystemBars(scheme);
+  syncSystemBars(currentSkin() === 'scarlet' ? 'dark' : scheme);
   if (persist) localStorage.setItem(SCHEME_KEY, scheme);
   else localStorage.removeItem(SCHEME_KEY);
 }
@@ -49,5 +50,5 @@ export function currentAccent(): string {
 export function initTheme(): void {
   applyAccent(currentAccent(), false);
   // 初始 scheme 由 index.html 首帧脚本落定，这里只向原生侧同步一次
-  syncSystemBars(currentScheme());
+  initSkin();
 }

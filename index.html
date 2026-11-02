@@ -10,6 +10,7 @@
     // 首帧前落 scheme，避免刷白/刷黑：本机锁定 > config.js 指定 > 内置默认深色
     (function () {
       try {
+        document.documentElement.dataset.skin = localStorage.getItem('yuzu-skin') === 'scarlet' ? 'scarlet' : 'default';
         var saved = localStorage.getItem('yuzu-scheme');
         var cfg = (globalThis.YUZU_CONFIG && YUZU_CONFIG.scheme) || '';
         document.documentElement.dataset.scheme = saved || cfg || 'dark';
@@ -18,9 +19,6 @@
       }
     })();
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
 </head>
 <body>
   <div id="root"></div>

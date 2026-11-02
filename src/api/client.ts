@@ -66,6 +66,7 @@ import type {
   UpdatePlaylistMetaInput,
   UpdateRoomInput,
   UploadMediaMeta,
+  UnifiedAuthConfig,
 } from './types';
 
 interface ApiClientOptions {
@@ -106,6 +107,28 @@ export class ApiClient {
     });
   }
 
+  async unifiedAuth(): Promise<AuthOk> {
+    return this.#json<AuthOk>('/api/v1/auth/unified', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  }
+
+  async browserAuthExchange(code: string, verifier: string): Promise<AuthOk> {
+    return this.#json<AuthOk>('/api/v1/auth/browser/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ code, code_verifier: verifier }),
+    });
+  }
+
+  async unifiedAuthConfig(): Promise<UnifiedAuthConfig | null> {
+    const response = await this.#send('/api/v1/auth/unified/config');
+    if (response.status === 404) {
+      return null;
+    }
+    return this.#readJson<UnifiedAuthConfig>(response);
+  }
+
   async oidcAuth(idToken: string, accessToken?: string): Promise<AuthOk> {
     return this.#json<AuthOk>('/api/v1/auth/oidc', {
       method: 'POST',
@@ -144,6 +167,15 @@ export class ApiClient {
   async listRooms(): Promise<RoomInfo[]> {
     const result = await this.#json<{ rooms: RoomInfo[] | null }>('/api/v1/rooms');
     return asList(result.rooms);
+  }
+
+  /** Bulk metadata lookup must not block the WebSocket heartbeat. */
+  async addRoomQueue(roomId: string, refs: string[]): Promise<string[]> {
+    const result = await this.#json<{ entry_ids: string[] }>(
+      `/api/v1/rooms/${encodeURIComponent(roomId)}/queue`,
+      { method: 'POST', body: JSON.stringify({ track_refs: refs }) },
+    );
+    return result.entry_ids;
   }
 
   async createRoom(input: CreateRoomInput): Promise<RoomMutationResult> {

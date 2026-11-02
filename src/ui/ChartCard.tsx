@@ -41,9 +41,9 @@ export function ChartCard({
       disabled={!usable}
       title={usable ? undefined : t('radio.credentialNeed')}
       onClick={() => navigate(`/source/${encodeURIComponent(entry.spec)}`)}
-      className={`group block rounded-lg p-3 text-left transition-colors hover:bg-panel-2 disabled:opacity-40 ${className}`}
+      className={`music-card chart-card group flex flex-col items-stretch justify-start snap-start rounded-2xl p-2 text-left transition-colors hover:bg-panel-2 disabled:opacity-40 ${className}`}
     >
-      <div className="relative aspect-square w-full overflow-hidden rounded-md transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--rail)]">
+      <div className="relative aspect-square w-full flex-none overflow-hidden rounded-md transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--rail)]">
         {entry.cover_url ? (
           <CoverThumb
             src={coverSrc(entry.cover_url)}
@@ -51,13 +51,13 @@ export function ChartCard({
             className="h-full w-full rounded-md"
           />
         ) : (
-          <span className="grid h-full w-full place-items-center bg-panel-2 text-faint">
+          <span className="chart-placeholder grid h-full w-full place-items-center text-accent">
             <ListMusic className="h-7 w-7" aria-hidden="true" />
           </span>
         )}
       </div>
       <div className="mt-3 truncate text-[15px] font-semibold text-paper">{entry.name}</div>
-      {subtitle && <div className="mt-1 line-clamp-2 text-[13px] text-muted">{subtitle}</div>}
+      <div className="chart-description mt-1 min-h-[2.6rem] text-[13px] text-muted"><span className="line-clamp-2">{subtitle}</span></div>
     </button>
   );
 }

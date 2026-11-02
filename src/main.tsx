@@ -5,6 +5,7 @@ import { faviconUrl, pageTitle } from './config';
 import './i18n';
 import { initBackButton } from './ui/backbutton';
 import './styles/tokens.css';
+import './styles/scarlet.css';
 
 // 品牌运行期配置（config.js）：标题与 favicon
 document.title = pageTitle;

@@ -1,0 +1,262 @@
+.theme-accent-grid { display: grid; grid-template-columns: repeat(8,minmax(0,1fr)); gap: 6px; min-inline-size: 0; }
+.theme-accent-grid > button, .theme-accent-grid > label { width: 100%; height: auto; min-width: 0; margin-left: 0; aspect-ratio: 1; }
+/* Optional Scarlet Devil Mansion skin. Base preferences remain untouched. */
+:root[data-skin="scarlet"] {
+  color-scheme: dark;
+  --accent: #ce2b4a !important;
+  --on-accent: #ffffff !important;
+  --accent-soft: rgba(220,54,88,.16) !important;
+  --accent-line: rgba(231,89,118,.45) !important;
+  --ring: #f18a9c !important;
+  --hall: #1c090f;
+  --panel: #290f18;
+  --panel-2: #3a1723;
+  --paper: #fff1e9;
+  --muted: #d5aab4;
+  --faint: #b68b99;
+  --hairline: #60303d;
+  --rail: rgba(231,165,162,.2);
+  --hover: rgba(241,131,153,.09);
+  --glass: rgba(46,13,25,.94);
+  --scarlet-gold: #dfbe82;
+  --scarlet-ink: #230b14;
+  --surface-shadow: 0 10px 35px rgba(10,0,5,.3);
+  --cover-shadow: 0 16px 40px rgba(12,0,5,.5);
+  --font-display: "Iowan Old Style", "Palatino Linotype", "Noto Serif SC", "Songti SC", "SimSun", serif;
+}
+.skin-chooser { border-top: 1px solid var(--hairline); padding: 12px 8px 6px; }
+.skin-chooser-label { display: block; margin-bottom: 8px; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .12em; }
+.scarlet-choice { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 68px; padding: 10px; border: 1px solid #85404e; border-radius: 12px; background: linear-gradient(120deg,#491824,#270d17); text-align: left; color: #f9ede5; transition: border-color 200ms, box-shadow 200ms; }
+.scarlet-choice:hover, .scarlet-choice[aria-pressed="true"] { border-color: #dfbe82; box-shadow: inset 0 0 20px rgba(220,54,88,.12); }
+.skin-choice-crest { width: 40px; flex: none; color: #e2607e; --scarlet-gold: #dfbe82; }
+.scarlet-choice strong { display: block; font-family: "Songti SC", "SimSun", serif; font-size: 16px; letter-spacing: .12em; }
+.scarlet-choice small { display: block; margin-top: 3px; color: #d9acb6; font-size: 10px; }
+.skin-choice-dot { width: 6px; height: 6px; margin-left: auto; border: 1px solid #d9acb6; border-radius: 50%; flex: none; }
+.scarlet-choice[aria-pressed="true"] .skin-choice-dot { background: #dfbe82; border-color: #dfbe82; box-shadow: 0 0 10px #dfbe8255; }
+.skin-palette-note { margin: 8px 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.scarlet-atmosphere { position: fixed; inset: 0; z-index: 25; overflow: hidden; pointer-events: none; user-select: none; }
+.scarlet-moon { position: absolute; right: 6%; top: -48px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle at 35% 35%,#ed9a9055,#b4224355 60%,#841d3633); box-shadow: 0 0 90px #ad193333,inset -20px -6px 40px #4e102655; opacity: .24; }
+.scarlet-flight { position: absolute; width: 70px; color: #e56684; opacity: .24; }
+.scarlet-flight-one { right: 15%; top: 18%; transform: rotate(-16deg); }
+.scarlet-flight-two { left: 3%; bottom: 24%; width: 48px; transform: rotate(14deg); }
+.scarlet-thorns { position: absolute; bottom: 5rem; left: 0; width: 130px; height: 150px; opacity: .16; background: repeating-linear-gradient(36deg,transparent 0 19px,#d45b77 20px 21px,transparent 22px 41px),repeating-linear-gradient(-36deg,transparent 0 19px,#d45b77 20px 21px,transparent 22px 41px); mask-image: linear-gradient(to top right,#000,transparent 75%); }
+.mansion-clock { display: block; width: 100%; opacity: .7; }
+.scarlet-hour-hand { transform-origin: 120px 120px; transform: rotate(300deg); }
+.scarlet-minute-hand { transform-origin: 120px 120px; transform: rotate(24deg); }
+:root[data-skin="scarlet"] .app-toolbar { background: linear-gradient(100deg,#300c18,#250d17); border-bottom-color: #8f445655; }
+:root[data-skin="scarlet"] .app-brand { font-family: var(--font-display); }
+:root[data-skin="scarlet"] .brand-icon { border: 1px solid #d8ac76; border-radius: 12px 12px 5px 5px; background: #6c2033; color: #f1d5a5; }
+:root[data-skin="scarlet"] .content-panel { background-image: radial-gradient(ellipse at 95% 0%,#661a2a30,transparent 55%); }
+:root[data-skin="scarlet"] .library-sidebar { background: linear-gradient(90deg,#230b14,#310e1a); }
+:root[data-skin="scarlet"] .sidebar-link.is-active { border: 1px solid #86404d; background: linear-gradient(100deg,#6e2035,#481525); color: #ffe1db; }
+:root[data-skin="scarlet"] .sidebar-link:not(.is-active) { border: 1px solid transparent; }
+:root[data-skin="scarlet"] .home-heading { position: relative; border-bottom-color: #9f725544; }
+:root[data-skin="scarlet"] .home-heading::after { content: "✦"; position: absolute; right: 4px; bottom: -12px; padding: 0 8px; background: var(--panel); color: #d7ad72; font-size: 13px; }
+:root[data-skin="scarlet"] h1, :root[data-skin="scarlet"] .home-page h2 { font-family: var(--font-display); letter-spacing: .035em; }
+:root[data-skin="scarlet"] .listening-hero { position: relative; border: 1px solid #8b4551; background: radial-gradient(ellipse at 85% 0%,#9a2b4340,transparent 65%),linear-gradient(120deg,#461625,#30101d); box-shadow: inset 0 0 0 5px #290c1544; }
+:root[data-skin="scarlet"] .hero-art > img { border: 1px solid #c09465; padding: 4px; background: #240b15; box-shadow: 0 12px 30px #12000788,0 0 0 4px #b8715822; border-radius: 50% 50% 12px 12px; }
+:root[data-skin="scarlet"] .hero-controls { border-color: #92515c; background: linear-gradient(120deg,#3e1222cc,#280c17cc); box-shadow: inset 0 1px 0 #d6a5741c; }
+:root[data-skin="scarlet"] .hero-title { color: #ffeddf; }
+:root[data-skin="scarlet"] .hero-eyebrow { color: #f28da6; }
+:root[data-skin="scarlet"] .room-playback-status { border-color: #945562; background: #360f1f; color: #f2c1cb; }
+:root[data-skin="scarlet"] .room-playback-primary { box-shadow: inset 0 1px #ffb7c244,0 4px 16px #c2244333; }
+:root[data-skin="scarlet"] .room-playback-button { border-radius: 10px; }
+:root[data-skin="scarlet"] .music-card > div:first-child { border: 1px solid #a16d5555; padding: 3px; background: #1c0810; box-shadow: 0 6px 18px #0c000744; }
+:root[data-skin="scarlet"] .chart-placeholder { background: radial-gradient(circle at 50% 35%,#82233e33,transparent 65%),linear-gradient(135deg,#581a2b,#2c0e19); }
+:root[data-skin="scarlet"] .desktop-player {
+  --glass: rgba(35, 27, 35, .94);
+  border-color: #d8b88c88;
+  box-shadow: 0 18px 48px #09020799, 0 4px 14px #09020766, inset 0 1px 0 #ffe8ce33;
+}
+:root[data-skin="scarlet"] .desktop-player input[type="range"]::-webkit-slider-thumb { background: #f18a9c; }
+:root[data-skin="scarlet"] .desktop-player input[type="range"]::-moz-range-thumb { background: #f18a9c; }
+:root[data-skin="scarlet"] .desktop-player::before { content: "✦"; position: absolute; left: 50%; color: #d7ad72; font-size: 10px; transform: translateY(-40px); pointer-events: none; }
+:root[data-skin="scarlet"] .mobile-chrome { border-top-color: #a16d55; background: #280b16ed; }
+:root[data-skin="scarlet"] .mobile-player { border-color: #92515c; background: linear-gradient(100deg,#501729,#300d1c); }
+:root[data-skin="scarlet"] .login-card { border-color: #955363; background: linear-gradient(145deg,#3e1221,#260d17); }
+:root[data-skin="scarlet"] .material-dialog, :root[data-skin="scarlet"] .menu-content { border-color: #945562; box-shadow: 0 10px 45px #10000688,inset 0 1px #e1af7022; }
+@media (width < 48rem) {
+  .scarlet-moon { width: 110px; height: 110px; right: -30px; }
+  .scarlet-flight-one { right: 2%; width: 40px; }
+  .scarlet-thorns { bottom: 8rem; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .scarlet-atmosphere { display: none; }
+  :root[data-skin="scarlet"] .hero-controls { background: #32101c; }
+}
+@media (prefers-contrast: more) {
+  :root[data-skin="scarlet"] { --muted: #fff1e9; --faint: #fff1e9; --hairline: #c58c98; }
+  .scarlet-atmosphere { display: none; }
+}
+
+:root[data-skin="scarlet"] .text-accent { color: #f18ba1; }
+
+.scarlet-corner-clock { position: absolute; top: -85px; right: -65px; width: 320px; color: #dfbe82; opacity: .32; transform: rotate(-12deg); }
+.scarlet-frozen-knives { position: absolute; left: -40px; bottom: calc(var(--chrome-b) - 12px); width: 240px; color: #e0d3e5; opacity: .36; transform: rotate(-18deg); }
+@media (width < 48rem) {
+  .scarlet-corner-clock { width: 210px; top: -65px; right: -55px; opacity: .3; }
+  .scarlet-frozen-knives { width: 160px; left: -42px; opacity: .32; }
+}
+
+:root[data-skin="scarlet"] .fullscreen-player { --fullscreen-ambient-a: #721a35; --fullscreen-ambient-b: #3d1b38; background: #1b0b14; }
+.scarlet-corner-clock svg { stroke-width: 1.25; }
+.scarlet-corner-clock circle:first-child { stroke-width: 1.2; }
+.scarlet-frozen-knives path { stroke-width: 1.5; }
+/* Keep corner ornaments visible above the immersive stage without intercepting controls. */
+body:has(.fullscreen-player) .scarlet-atmosphere { z-index: 51; opacity: .75; }
+
+/* Sewn-on trims: local vector ornaments stay within each surface and never
+   capture input. Dialog positioning remains owned by the Radix primitives. */
+/* Anchor lace without overriding popovers or context menus positioned by the UI. */
+:root[data-skin="scarlet"] .login-card,
+:root[data-skin="scarlet"] .menu-content:not(.absolute):not(.fixed) { position: relative; }
+:root[data-skin="scarlet"] :is(.material-dialog, .login-card) {
+  border-color: #c19a67;
+  padding-top: 42px;
+  padding-bottom: 28px;
+  box-shadow: inset 0 0 0 4px #280d19, inset 0 0 0 5px #b88b595c, 0 12px 32px #10000666;
+}
+:root[data-skin="scarlet"] :is(.material-dialog, .login-card)::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid #dfbe8255;
+  border-radius: inherit;
+  background: url('./assets/scarlet-lace.svg') left top / 48px 22px repeat-x,
+    url('./assets/scarlet-lace.svg') left bottom / 48px 22px repeat-x;
+  pointer-events: none;
+}
+:root[data-skin="scarlet"] :is(.material-dialog, .login-card)::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: calc(50% - 44px);
+  width: 88px;
+  height: 36px;
+  background: url('./assets/scarlet-bow.svg') center / contain no-repeat;
+  pointer-events: none;
+}
+:root[data-skin="scarlet"] .menu-content {
+  padding-block: 18px;
+  border-color: #b58c59;
+  box-shadow: inset 0 0 0 3px #280d19, inset 0 0 0 4px #dfbe8240, 0 10px 35px #10000688;
+}
+:root[data-skin="scarlet"] .menu-content::before {
+  content: "";
+  position: absolute;
+  inset: 3px 8px auto;
+  height: 12px;
+  background: url('./assets/scarlet-lace.svg') center top / 32px 14px repeat-x;
+  pointer-events: none;
+}
+:root[data-skin="scarlet"] .home-heading {
+  padding-bottom: 30px;
+  background: url('./assets/scarlet-lace.svg') left bottom / 48px 22px repeat-x;
+}
+:root[data-skin="scarlet"] .home-heading::after { content: none; }
+:root[data-skin="scarlet"] :is(.hero-controls, .shortcut-card, .music-card > div:first-child) {
+  border-color: #bd946366;
+  box-shadow: inset 0 0 0 3px #280d19, inset 0 0 0 4px #dfbe8233;
+}
+:root[data-skin="scarlet"] .desktop-player::before {
+  content: "";
+  inset: 3px 42px auto;
+  height: 12px;
+  transform: none;
+  background: url('./assets/scarlet-lace.svg') center top / 32px 14px repeat-x;
+}
+:root[data-skin="scarlet"] .mobile-player {
+  border: 1px solid #bd9463;
+  box-shadow: inset 0 0 0 3px #280d19, inset 0 0 0 4px #dfbe8233;
+}
+
+/* The listening card has its own fitted frame instead of a stretched image.
+   Only the lace repeats; corners and the crest keep their original proportions. */
+:root[data-skin="scarlet"] .listening-hero {
+  padding: 24px 18px 18px;
+  border: 1px solid #c19a67;
+  border-radius: 24px;
+  box-shadow: inset 0 0 0 5px #280d19, inset 0 0 0 6px #ad7d4e66, 0 12px 32px #10000666;
+}
+.scarlet-hero-frame,
+.scarlet-hero-frame > span,
+.scarlet-hero-frame::before,
+.scarlet-hero-frame::after {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+.scarlet-hero-frame { inset: 0; z-index: 1; border-radius: inherit; }
+.scarlet-hero-frame::before {
+  content: "";
+  inset: 11px;
+  border: 1px solid #dfbe8266;
+  border-radius: 17px;
+}
+.scarlet-hero-frame::after {
+  content: "";
+  inset: 16px;
+  border: 1px solid #dfbe8226;
+  border-radius: 13px;
+}
+.scarlet-hero-lace {
+  inset-inline: 104px;
+  height: 21px;
+  background: url('./assets/scarlet-lace.svg') left top / 44px 20px repeat-x;
+  opacity: .85;
+}
+.scarlet-hero-lace-top { top: 16px; }
+.scarlet-hero-lace-bottom { bottom: 16px; transform: scaleY(-1); }
+.scarlet-hero-corner {
+  width: 116px;
+  height: 116px;
+  background: url('./assets/scarlet-hero-corner.svg') center / contain no-repeat;
+}
+.scarlet-hero-corner-tl { top: 0; left: 0; }
+.scarlet-hero-corner-tr { top: 0; right: 0; transform: scaleX(-1); }
+.scarlet-hero-corner-bl { bottom: 0; left: 0; transform: scaleY(-1); }
+.scarlet-hero-corner-br { bottom: 0; right: 0; transform: scale(-1); }
+.scarlet-hero-crest {
+  top: -1px;
+  left: 50%;
+  width: 280px;
+  height: 69px;
+  transform: translateX(-50%);
+  background: url('./assets/scarlet-hero-crest.svg') center / contain no-repeat,
+    radial-gradient(ellipse at 50% 35%, #421323 25%, #42132300 72%);
+}
+.scarlet-hero-pendant {
+  bottom: 1px;
+  left: 50%;
+  width: 180px;
+  height: 36px;
+  transform: translateX(-50%);
+  background: url('./assets/scarlet-hero-pendant.svg') center / contain no-repeat,
+    radial-gradient(ellipse, #36101e 30%, #36101e00 72%);
+}
+:root[data-skin="scarlet"] .listening-hero .hero-controls {
+  border-color: #b58b5c99;
+  box-shadow: inset 0 0 0 3px #280d19, inset 0 0 0 4px #dfbe8233;
+}
+@media (width < 48rem) {
+  :root[data-skin="scarlet"] :is(.material-dialog, .login-card) { padding-top: 36px; padding-bottom: 24px; }
+  :root[data-skin="scarlet"] :is(.material-dialog, .login-card)::before { background-size: 36px 17px; }
+  :root[data-skin="scarlet"] :is(.material-dialog, .login-card)::after { width: 72px; height: 29px; left: calc(50% - 36px); }
+  :root[data-skin="scarlet"] .listening-hero { padding: 30px 8px 22px; border-radius: 20px; }
+  :root[data-skin="scarlet"] .listening-hero .hero-copy { padding-inline: 24px; }
+  :root[data-skin="scarlet"] .listening-hero .hero-art { top: 56px; right: 28px; }
+  .scarlet-hero-frame::before { inset: 9px; border-radius: 13px; }
+  .scarlet-hero-frame::after { inset: 13px; border-radius: 10px; }
+  .scarlet-hero-corner { width: 74px; height: 74px; }
+  .scarlet-hero-lace { inset-inline: 64px; height: 16px; background-size: 32px 15px; }
+  .scarlet-hero-lace-top { top: 13px; }
+  .scarlet-hero-lace-bottom { bottom: 13px; }
+  .scarlet-hero-crest { top: 2px; width: 190px; height: 47px; }
+  .scarlet-hero-pendant { bottom: 1px; width: 128px; height: 26px; }
+}
+@media (prefers-contrast: more), (forced-colors: active) {
+  :root[data-skin="scarlet"] :is(.material-dialog, .login-card, .listening-hero, .menu-content, .desktop-player)::before,
+  :root[data-skin="scarlet"] :is(.material-dialog, .login-card)::after { display: none; }
+  .scarlet-hero-frame { display: none; }
+  :root[data-skin="scarlet"] .home-heading { background-image: none; }
+}

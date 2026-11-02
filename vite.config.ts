@@ -7,14 +7,14 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const server = env.VITE_YUZU_SERVER || 'http://127.0.0.1:8080';
+  const proxy = {
+    '/api': { target: server, changeOrigin: true },
+    '/stream': { target: server, changeOrigin: true },
+    '/ws': { target: server, ws: true, changeOrigin: true },
+  };
   return {
     plugins: [react(), tailwindcss()],
-    server: {
-      proxy: {
-        '/api': { target: server, changeOrigin: true },
-        '/stream': { target: server, changeOrigin: true },
-        '/ws': { target: server, ws: true, changeOrigin: true },
-      },
-    },
+    server: { proxy },
+    preview: { proxy },
   };
 });

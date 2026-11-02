@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="gold" x1="8" y1="8" x2="92" y2="92" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f4dfb5"/><stop offset=".48" stop-color="#c79b63"/><stop offset="1" stop-color="#89603d"/>
+    </linearGradient>
+    <g id="sprig" stroke="url(#gold)" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 19H109M23 26H99" stroke-opacity=".65"/>
+      <path d="M24 21C40 21 42 40 58 36C72 32 63 17 55 24C50 29 58 33 60 28M61 35C75 35 78 12 91 16C100 19 94 30 88 25C85 22 89 19 91 22" stroke-width="1.3"/>
+      <path d="M34 21C40 11 50 11 57 15C48 14 48 23 42 25M68 27C72 14 79 8 86 10C82 16 78 23 68 27Z" fill="#a77b4b" fill-opacity=".28"/>
+      <path d="M40 27C42 41 52 48 61 43C54 40 53 31 40 27ZM77 30C79 37 85 40 92 36C85 35 87 29 77 30Z" fill="#dfbe82" fill-opacity=".22"/>
+      <path d="M100 18L104 13L108 18L104 23Z" fill="#dfbe82" stroke-width=".7"/>
+      <circle cx="114" cy="19" r="1.3" fill="#dfbe82" stroke="none"/>
+    </g>
+  </defs>
+  <path d="M7 58V30A23 23 0 0 1 30 7H58" stroke="url(#gold)" stroke-width="1.4"/>
+  <path d="M12 52V30A18 18 0 0 1 30 12H52" stroke="#dfbe82" stroke-opacity=".5"/>
+  <use href="#sprig"/>
+  <use href="#sprig" transform="matrix(0 1 1 0 0 0)"/>
+  <path d="M19 9L29 19L19 29L9 19Z" fill="#38101e" stroke="url(#gold)"/>
+  <path d="M19 12L25 19L19 26L13 19Z" fill="#a23851" stroke="#edc793" stroke-width=".7"/>
+  <path d="M19 15L16 19" stroke="#f5b6b8" stroke-linecap="round"/>
+  <path d="M29 29L35 35M33 39L39 33" stroke="#dfbe82" stroke-opacity=".65"/>
+  <circle cx="38" cy="38" r="2" fill="#dfbe82"/>
+</svg>

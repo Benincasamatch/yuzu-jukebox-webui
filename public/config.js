@@ -20,8 +20,10 @@ globalThis.YUZU_CONFIG = {
   server: '',
   oidc_client_id: '',
   title: 'Yuzu Jukebox',
-  favicon: '',
+  favicon: 'sakuya-icon.png',
   accent: '#6A8FD8',
   scheme: '',
-  admin_password_enabled: false,
+  android_update_url: 'https://music.102.yuna.team/app-updates/latest.json',
+  android_download_url: 'https://music.102.yuna.team/app-updates/latest.apk',
+  admin_password_enabled: true,
 };

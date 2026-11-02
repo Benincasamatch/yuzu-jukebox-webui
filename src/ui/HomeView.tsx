@@ -5,6 +5,13 @@
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { ArrowUpRight, Headphones, ListMusic, LoaderCircle, Pause, Play, Radio, Search, SkipForward } from 'lucide-react';
+import { RoomVolumeControl } from './RoomVolumeControl';
+import { WebFollowControl } from './WebFollowControl';
+import { ScarletHeroFrame } from './ScarletSkin';
+import { ChartCard } from './ChartCard';
+import { coverSrc } from './cover';
+import { ArtistLinks } from './artist';
 import type {
   HistoryEntry,
   HotTrack,
@@ -15,25 +22,119 @@ import { api, roomStore } from '../app/session';
 import { ActivityCard } from './ActivityCard';
 import { formatClock } from './format';
 import { useIdentity, useProviders, useRoomState } from './hooks';
-import { SOURCE_DESC_KEYS } from './radioSources';
+import { isVisibleRadioSource } from './radioSources';
 import { useToast } from './toast';
 import { useShell } from './AppShell';
 
 export default function HomeView(): JSX.Element {
   const { t } = useTranslation();
   const identity = useIdentity();
+  const navigate = useNavigate();
+  const state = useRoomState();
+  const { canControl, setFullscreenOpen } = useShell();
+  const { showError } = useToast();
+  const [controlAction, setControlAction] = useState<'toggle' | 'skip' | null>(null);
+  const controlBusy = controlAction !== null;
+  const controlRoom = async (action: 'toggle' | 'skip') => {
+    if (!canControl || !state.roomId || !state.playback.current || state.playback.preparing || controlBusy) return;
+    setControlAction(action);
+    try {
+      await (action === 'skip' ? roomStore.skip() : state.playback.playing ? roomStore.pause() : roomStore.resume());
+    } catch (error) {
+      showError(error);
+    } finally {
+      setControlAction(null);
+    }
+  };
+  const current = state.playback.current;
 
   return (
-    <div className="view-enter px-4 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-6">
-      <h1 className="text-[32px] font-bold text-paper">
-        {t('lobby.greeting', { period: t(greetingKey()), name: identity?.name ?? '' })}
-      </h1>
+    <div className="home-page view-enter px-5 pt-[calc(var(--header-h)+0.75rem)] pb-10 md:px-8 md:pt-8">
+      <header className="home-heading">
+        <p className="text-sm text-muted">{t('lobby.greeting', { period: t(greetingKey()), name: identity?.name ?? '' })}</p>
+        <h1 className="mt-1 text-[34px] font-bold tracking-tight text-paper">{t('home.listenTitle')}</h1>
+      </header>
+      {current && <section className="listening-hero" aria-label={t('home.listenTitle')}>
+        <ScarletHeroFrame />
+        <div className="hero-copy">
+          <span className="hero-eyebrow"><span className="status-dot" />{t('np.title')}</span>
+          <h2 className="hero-title">{current.title}</h2>
+          <ArtistLinks artist={current.artist} contributors={current.contributors} trackRef={current.track_ref} className="text-muted" />
+          <div className="hero-controls">
+            <div className="room-playback-control" role="group" aria-labelledby="room-playback-label" aria-busy={controlBusy}>
+              <div className="room-control-heading">
+                <span id="room-playback-label">{t('home.roomPlaybackLabel')}</span>
+                <span className="room-playback-status" aria-live="polite">
+                  <span className="status-dot" aria-hidden="true" />
+                  {t(state.playback.preparing ? 'home.roomPreparing' : state.playback.playing ? 'home.roomPlaying' : 'home.roomPaused')}
+                </span>
+              </div>
+              <div className="room-control-actions">
+                <div className="room-transport">
+                  <button
+                    type="button"
+                    className="room-playback-button room-playback-primary"
+                    disabled={!canControl || controlBusy || state.playback.preparing}
+                    aria-label={t(state.playback.playing ? 'home.pauseRoom' : 'home.resumeRoom')}
+                    title={!canControl ? t('home.roomControlRequired') : undefined}
+                    onClick={() => void controlRoom('toggle')}
+                  >
+                    {controlAction === 'toggle' ? <LoaderCircle className="control-spinner h-4 w-4" aria-hidden="true" /> : state.playback.playing ? <Pause className="h-4 w-4 fill-current" aria-hidden="true" /> : <Play className="h-4 w-4 fill-current" aria-hidden="true" />}
+                    {t(state.playback.playing ? 'room.pause' : 'room.resume')}
+                  </button>
+                  <button
+                    type="button"
+                    className="room-playback-button room-skip-button"
+                    disabled={!canControl || controlBusy || state.playback.preparing}
+                    aria-label={t('home.skipRoom')}
+                    title={!canControl ? t('home.roomControlRequired') : t('home.skipRoom')}
+                    onClick={() => void controlRoom('skip')}
+                  >
+                    {controlAction === 'skip' ? <LoaderCircle className="control-spinner h-4 w-4" aria-hidden="true" /> : <SkipForward className="h-4 w-4 fill-current" aria-hidden="true" />}
+                    {t('home.nextTrack')}
+                  </button>
+                </div>
+                <button type="button" className="hero-action" onClick={() => setFullscreenOpen(true)}>
+                  <Headphones className="h-4 w-4" aria-hidden="true" />
+                  {t('room.expand')}
+                  <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+              <div className="room-listening-options">
+                {state.roomId && <RoomVolumeControl key={state.roomId} roomId={state.roomId} disabled={!canControl} />}
+                <WebFollowControl />
+              </div>
+              {!canControl && <p className="room-control-hint">{t('home.roomControlRequired')}</p>}
+            </div>
+          </div>
+        </div>
+        <div className="hero-art" aria-hidden="true">
+          {current?.cover_url ? <img src={coverSrc(current.cover_url)} alt="" /> : (
+            <div className="record-art"><div className="record-label"><Headphones className="h-9 w-9" /></div></div>
+          )}
+        </div>
 
-      <ChartsSection />
-      <RadioSection />
+      </section>}
+
       <HotSection />
       <RecentSection />
       <RoomActivitySections />
+      <ChartsSection />
+
+      <nav className="home-shortcuts" aria-label={t('home.explore')}>
+        {[
+          { label: t('shell.navSearch'), description: t('home.searchDescription'), icon: Search, action: () => navigate('/search') },
+          { label: t('home.chartsTitle'), description: t('home.chartsDescription'), icon: Radio, action: () => navigate('/charts') },
+          { label: t('shell.library'), description: t('home.libraryDescription'), icon: ListMusic, action: () => navigate('/library') },
+        ].map(({ label, description, icon: Icon, action }) => (
+          <button key={label} type="button" className="shortcut-card" onClick={action}>
+            <Icon className="shortcut-icon h-5 w-5" aria-hidden="true" />
+            <span><strong>{label}</strong><small>{description}</small></span>
+            <ArrowUpRight className="ml-auto h-4 w-4 shrink-0 text-faint" aria-hidden="true" />
+          </button>
+        ))}
+      </nav>
+
     </div>
   );
 }
@@ -60,13 +161,13 @@ function ShelfHeader({
 }): JSX.Element {
   return (
     <div className="mb-4 flex items-center justify-between gap-4">
-      <h2 className="text-2xl font-bold text-paper">{title}</h2>
+      <h2 className="text-[22px] font-bold tracking-tight text-paper">{title}</h2>
       {actionLabel && onAction && (
         <button
           type="button"
           disabled={actionDisabled}
           onClick={onAction}
-          className="text-[13px] font-semibold text-muted hover:underline disabled:opacity-40"
+          className="text-[13px] font-medium text-accent hover:underline disabled:opacity-40"
         >
           {actionLabel}
         </button>
@@ -75,14 +176,10 @@ function ShelfHeader({
   );
 }
 
-const shelfGridClass = 'grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5';
-const collectionCardClass =
-  'rounded-lg bg-[var(--hover)] p-4 text-left transition-colors hover:bg-panel-2 disabled:opacity-40';
-
-/** 封面 shelf 单行：定宽卡片横向滚动（Spotify 首页行形态），卡宽由卡片 className 控制。 */
+/** 封面 shelf 单行：定宽卡片横向滚动（横向吸附滚动），卡宽由卡片 className 控制。 */
 function ShelfRow({ children }: { children: ReactNode }): JSX.Element {
   return (
-    <div className="no-scrollbar -mx-2 flex gap-2 overflow-x-auto px-2 pb-1">{children}</div>
+    <div className="music-shelf no-scrollbar -mx-2 flex snap-x gap-3 overflow-x-auto px-2 pb-3">{children}</div>
   );
 }
 
@@ -103,7 +200,7 @@ function ChartsSection(): JSX.Element | null {
     api
       .radioCatalogAll()
       .then((rows) => {
-        if (!dead) setEntries(rows);
+        if (!dead) setEntries(rows.filter((entry) => isVisibleRadioSource(entry.spec)));
       })
       .catch((error: unknown) => {
         if (dead) return;
@@ -138,106 +235,9 @@ function ChartsSection(): JSX.Element | null {
           const credentialOk =
             (providers?.find((p) => p.id === entry.provider)?.credential_status ?? 'none') ===
             'ok';
-          const usable = !entry.requires_credential || credentialOk;
-          // 纯文字卡（与随便听听同形态）：标题 + 来源；封面留给 /charts 全览页
-          return (
-            <button
-              key={entry.spec}
-              type="button"
-              disabled={!usable}
-              title={usable ? undefined : t('radio.credentialNeed')}
-              onClick={() => navigate(`/source/${encodeURIComponent(entry.spec)}`)}
-              className={`${collectionCardClass} w-[180px] flex-none`}
-            >
-              <div className="truncate text-[15px] font-semibold text-paper">{entry.name}</div>
-              <div className="mt-1 text-[13px] text-muted">
-                {t('home.chartFrom', { provider: entry.provider })}
-              </div>
-            </button>
-          );
+          return <ChartCard key={`${entry.provider}:${entry.spec}`} entry={entry} credentialOk={credentialOk} className="w-[180px] flex-none" />;
         })}
       </ShelfRow>
-    </section>
-  );
-}
-
-// ---------- 随便听听（无限流电台动作：开播即漫游，无列表形态） ----------
-
-function RadioSection(): JSX.Element | null {
-  const { t } = useTranslation();
-  const state = useRoomState();
-  const { canRadio, setRoomsOpen } = useShell();
-  const providers = useProviders();
-  const { show, showError } = useToast();
-  const [busy, setBusy] = useState(false);
-  const catalog = (providers ?? []).flatMap((p) =>
-    (p.capabilities?.radio_sources ?? []).map((source) => ({
-      providerId: p.id,
-      source,
-      credentialOk: p.credential_status === 'ok',
-      owned: p.owned === true,
-    })),
-  );
-
-  // 无限流才直接启动电台；有限源已内容化进「榜单」区，simi 由播放控制区提供。
-  const radios = catalog.filter(
-    (entry) => !entry.source.finite && entry.source.spec !== 'simi',
-  );
-
-  const start = (source: string) => {
-    if (!state.roomId) {
-      show(t('home.needRoom'));
-      setRoomsOpen(true);
-      return;
-    }
-    if (!canRadio) {
-      show(t('home.radioNeedControl'));
-      return;
-    }
-    if (busy) return;
-    setBusy(true);
-    void roomStore
-      .radioPlay(source)
-      .then(() => show(t('roomAdmin.radioStarted')))
-      .catch(showError)
-      .finally(() => setBusy(false));
-  };
-
-  if (radios.length === 0) return null;
-
-  return (
-    <section className="mt-10">
-      <ShelfHeader title={t('home.radioTitle')} />
-      <div className={shelfGridClass}>
-        {radios.map(({ providerId, source, credentialOk, owned }) => {
-          const usable = !source.requires_credential || credentialOk;
-          // 心动模式绑定凭据账号的喜欢列表：非 owner 可开，但先说明基底是谁的口味。
-          const descKey =
-            source.spec === 'heart' && source.requires_credential && !owned
-              ? 'radio.heartBoundHint'
-              : SOURCE_DESC_KEYS[source.spec];
-          return (
-            <button
-              key={`${providerId}:${source.spec}`}
-              type="button"
-              disabled={busy || !usable}
-              title={usable ? undefined : t('radio.credentialNeed')}
-              onClick={() => start(`${providerId}:${source.spec}`)}
-              className={collectionCardClass}
-            >
-              <div className="text-[15px] font-semibold text-paper">
-                {source.name ?? source.spec}
-              </div>
-              {descKey && (
-                <div className="mt-1 text-[13px] text-muted">{t(descKey)}</div>
-              )}
-            </button>
-          );
-        })}
-      </div>
-      {state.roomId && !canRadio && (
-        <p className="mt-2 text-[11px] text-faint">{t('home.radioNeedControl')}</p>
-      )}
     </section>
   );
 }

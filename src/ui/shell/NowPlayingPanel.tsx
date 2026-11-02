@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { ExternalLink, Heart, X } from 'lucide-react';
+import { ExternalLink, Heart, UserRound, X } from 'lucide-react';
 import { api } from '../../app/session';
 import type { Contributor } from '../../protocol/types';
 import { ArtistLinks, artistHref, splitArtistNames } from '../artist';
@@ -188,8 +188,8 @@ export function NowPlayingPanel() {
 }
 
 /**
- * 关于艺人卡（参照 Spotify About the artist）：上半部头像横幅 +「关于艺人」叠加层，
- * 下半部艺人名链接 + bio 摘要。多艺人字符串（「A/B/C」）先拆分，按序解析，
+ * 关于艺人卡：小圆头像 + 艺人名链接，下方展示 bio 摘要。
+ * 多艺人字符串（「A/B/C」）先拆分，按序解析，
  * 第一个解出 provider 实体的艺人上卡——整串直接解析大概率撞不到实体，
  * 是头像/详情经常缺失的根因。解析全灭时回退纯色卡 + 首艺人链接（带 track 锚定）。
  */
@@ -239,36 +239,33 @@ function ArtistSpotlight(props: {
   const link = profile?.link ?? artistHref(name, { trackRef });
 
   return (
-    <section className="mt-6 overflow-hidden rounded-md bg-panel-2">
-      <div className="relative">
-        {profile?.avatarUrl ? (
-          <img
-            src={coverSrc(profile.avatarUrl)}
-            alt={t('artistPage.avatarAlt', { name })}
-            className="aspect-[4/3] w-full object-cover"
-          />
-        ) : (
-          <div className="aspect-[4/3] w-full bg-panel" />
-        )}
-        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/45 to-transparent" />
-        <h3
-          className="absolute top-2.5 left-3 text-[13px] font-semibold text-paper"
-          style={{ textShadow: '0 1px 8px rgb(0 0 0 / 0.55)' }}
-        >
-          {t('np.aboutArtist')}
-        </h3>
-      </div>
-      <div className="px-4 py-3">
+    <section className="mt-6 rounded-xl bg-panel-2 p-4">
+      <h3 className="mb-3 text-[13px] font-semibold text-paper">{t('np.aboutArtist')}</h3>
+      <div className="flex min-w-0 items-center gap-3">
+        <Link to={link} className="h-12 w-12 flex-none overflow-hidden rounded-full bg-panel">
+          {profile?.avatarUrl ? (
+            <img
+              src={coverSrc(profile.avatarUrl)}
+              alt={t('artistPage.avatarAlt', { name })}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <span className="grid h-full w-full place-items-center text-muted">
+              <UserRound className="h-6 w-6" aria-hidden="true" />
+              <span className="sr-only">{t('artistPage.avatarAlt', { name })}</span>
+            </span>
+          )}
+        </Link>
         <Link
           to={link}
-          className="block truncate text-base font-bold text-paper transition hover:text-muted hover:underline"
+          className="min-w-0 truncate text-[14px] font-semibold text-paper transition hover:text-muted hover:underline"
         >
           {name}
         </Link>
-        {profile?.bio && (
-          <p className="mt-1.5 line-clamp-3 text-[12px] leading-5 text-muted">{profile.bio}</p>
-        )}
       </div>
+      {profile?.bio && (
+        <p className="mt-3 line-clamp-3 text-[12px] leading-5 text-muted">{profile.bio}</p>
+      )}
     </section>
   );
 }

@@ -5,11 +5,12 @@
  */
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useParams } from 'react-router-dom';
+import { Navigate, useParams } from 'react-router-dom';
 import { ListMusic } from 'lucide-react';
 import type { SearchTrack } from '../api/types';
 import { api } from '../app/session';
 import { useProviders } from './hooks';
+import { isVisibleRadioSource } from './radioSources';
 import { RadioPlayButton } from './RadioPlayButton';
 import { TrackList, useEnqueue } from './TrackList';
 import { useToast } from './toast';
@@ -17,9 +18,13 @@ import { useToast } from './toast';
 const PAGE_SIZE = 50;
 
 export default function SourceCollectionView(): JSX.Element {
+  const { spec = '' } = useParams();
+  if (!isVisibleRadioSource(spec)) return <Navigate to="/charts" replace />;
+  return <VisibleSourceCollection source={spec} />;
+}
+
+function VisibleSourceCollection({ source }: { source: string }): JSX.Element {
   const { t } = useTranslation();
-  const { spec: rawSpec } = useParams();
-  const source = decodeURIComponent(rawSpec ?? '');
   const providers = useProviders();
   const { showError } = useToast();
   const enqueue = useEnqueue();

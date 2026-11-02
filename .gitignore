@@ -9,3 +9,6 @@ dist
 coverage/
 .env*
 TODO.md
+
+# Published Android binaries are restored into dist after Web builds.
+releases/android/*.apk

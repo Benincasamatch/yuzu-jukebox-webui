@@ -1,5 +1,5 @@
 /**
- * 电台源目录的共享工具：RadioPanel（抽屉）与首页电台卡共用。
+ * 电台源目录的共享工具：榜单、集合页与歌单播放入口共用。
  * 目录本身来自 provider 能力报告（capabilities.radio_sources），前端不硬编码规格。
  */
 import type { ProviderInfo, RadioSourceInfo } from '../api/types';
@@ -7,12 +7,17 @@ import type { ProviderInfo, RadioSourceInfo } from '../api/types';
 /** 已知源规格的补充描述（name 由服务端给；desc 是纯文案，按 spec 键本地补充） */
 export const SOURCE_DESC_KEYS: Record<string, string> = {
   daily: 'radio.presetDailyDesc',
-  fm: 'radio.presetFmDesc',
-  heart: 'radio.presetHeartDesc',
   simi: 'radio.presetSimiDesc',
   top: 'radio.presetTopDesc',
   newsong: 'radio.presetNewsongDesc',
 };
+
+/** UI-only removal: backend capabilities and existing room radio state remain intact. */
+export function isVisibleRadioSource(source: string): boolean {
+  const [provider, spec] = source.split(':');
+  if (provider === 'playlist') return true; // Local playlist IDs can be arbitrary.
+  return spec !== 'fm' && spec !== 'heart';
+}
 
 /**
  * 组装源规格：`<provider>:<spec>`，带 arg 时追加参数。
@@ -44,5 +49,5 @@ export function entityRadioSource(
 ): RadioSourceInfo | null {
   const catalog =
     providers?.find((p) => p.id === providerId)?.capabilities?.radio_sources ?? [];
-  return catalog.find((s) => s.arg !== undefined && s.arg !== '' && s.arg !== 'track_id') ?? null;
+  return catalog.find((s) => isVisibleRadioSource(`${providerId}:${s.spec}`) && s.arg !== undefined && s.arg !== '' && s.arg !== 'track_id') ?? null;
 }

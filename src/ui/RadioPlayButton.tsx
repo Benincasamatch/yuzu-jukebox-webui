@@ -11,6 +11,7 @@ import { ChevronDown, Radio } from 'lucide-react';
 import { roomStore } from '../app/session';
 import { useRoomState } from './hooks';
 import { useShell } from './shellContext';
+import { isVisibleRadioSource } from './radioSources';
 import { useToast } from './toast';
 
 const MODES = [
@@ -26,7 +27,7 @@ export function RadioPlayButton({
   /** 完整电台源规格（如 ncm:newsong、qq:top:26、playlist:pl_xxx） */
   source: string;
   className?: string;
-}): JSX.Element {
+}): JSX.Element | null {
   const { t } = useTranslation();
   const state = useRoomState();
   const { canRadio, setRoomsOpen } = useShell();
@@ -58,6 +59,8 @@ export function RadioPlayButton({
       document.removeEventListener('keydown', onKey);
     };
   }, [menu]);
+
+  if (!isVisibleRadioSource(source)) return null;
 
   const open = () => {
     if (!state.roomId) {

@@ -7,6 +7,7 @@ const PRINCIPAL_KIND_KEYS: Record<string, string> = {
   guest: 'admin.integration.principalKindGuest',
   password: 'admin.integration.principalKindPassword',
   oidc: 'admin.integration.principalKindOidc',
+  unified: 'admin.integration.principalKindUnified',
 };
 
 

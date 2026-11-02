@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Library, ListPlus, Pin, Plus } from 'lucide-react';
+import { Download, Home, Library, ListPlus, Pin, Plus, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { DropdownMenu } from 'radix-ui';
@@ -14,7 +14,7 @@ import { useToast } from '../toast';
 const menuItemClass =
   'flex cursor-pointer items-center gap-2 rounded-md px-2.5 py-2 text-[13px] text-muted outline-none data-[highlighted]:bg-[var(--hover)] data-[highlighted]:text-paper';
 
-/** Spotify 风格桌面曲库栏：歌单数据随路由切换刷新；创建/导入入口按 media_admin 门控。 */
+/** 桌面导航与曲库栏：歌单数据随路由切换刷新；创建/导入入口按 media_admin 门控。 */
 export function LibraryRail() {
   const { t } = useTranslation();
   const location = useLocation();
@@ -45,9 +45,21 @@ export function LibraryRail() {
   }, [location.pathname, showError]);
 
   return (
-    <aside className="flex h-full w-full flex-col rounded-lg bg-panel">
+    <aside className="library-sidebar flex h-full w-full flex-col">
+      <nav className="sidebar-navigation" aria-label={t('shell.navigation')}>
+        {[
+          { to: '/', label: t('shell.navHome'), icon: Home },
+          { to: '/search', label: t('shell.navSearch'), icon: Search },
+          { to: '/library', label: t('shell.library'), icon: Library },
+        ].map(({ to, label, icon: Icon }) => (
+          <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => `sidebar-link ${isActive ? 'is-active' : ''}`}>
+            <Icon className="h-5 w-5" aria-hidden="true" />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
       <header className="flex flex-none items-center gap-3 px-4 py-3">
-        <Library className="h-6 w-6 flex-none text-muted" aria-hidden="true" />
+        <Library className="h-4 w-4 flex-none text-muted" aria-hidden="true" />
         <h2 className="min-w-0 flex-1 truncate text-base font-semibold text-paper">
           {t('lib.title')}
         </h2>

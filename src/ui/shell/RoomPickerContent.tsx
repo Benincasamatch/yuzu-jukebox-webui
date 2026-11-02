@@ -10,6 +10,7 @@ import { roomStore } from '../../app/session';
 import { useRooms, useRoomState } from '../hooks';
 import { formatMs } from '../format';
 import { useShell } from '../shellContext';
+import { RoomVolumeControl } from '../RoomVolumeControl';
 import { positionOf } from './PlayerBar';
 
 export function RoomPickerContent({ onClose }: { onClose: () => void }): JSX.Element {
@@ -120,66 +121,73 @@ export function RoomPickerContent({ onClose }: { onClose: () => void }): JSX.Ele
         })}
       </div>
 
-      {/* 房间控制区：controller 专属；与个人收听视图分离 */}
-      {canControl && current && (
+      {/* 房间控制区：controller 专属；与个人收听视图分离。即使房间空闲，
+          统一输出音量仍可预先设置。 */}
+      {canControl && currentId && (
         <div className="mt-1 border-t border-hairline px-2.5 pt-2.5 pb-1.5">
           <div className="pb-1.5 font-mono text-[11px] tracking-[0.14em] text-faint">
             {t('shell.roomControls')}
           </div>
-          <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px]">{current.title}</div>
-              <div className="truncate text-[11px] text-muted">{current.artist}</div>
-            </div>
-            <div className="flex flex-none items-center gap-1">
-              <button
-                type="button"
-                title={state.playback.playing ? t('room.pause') : t('room.resume')}
-                onClick={() =>
-                  void (state.playback.playing ? roomStore.pause() : roomStore.resume()).catch(
-                    () => {},
-                  )
-                }
-                className="grid h-8 w-8 place-items-center rounded-full bg-accent text-on-accent hover:brightness-105"
-              >
-                {state.playback.playing ? (
-                  <Pause className="h-4 w-4 fill-current" />
-                ) : (
-                  <Play className="ml-0.5 h-4 w-4 fill-current" />
-                )}
-              </button>
-              <button
-                type="button"
-                title={t('room.skip')}
-                onClick={() => void roomStore.skip().catch(() => {})}
-                className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-[var(--hover)] hover:text-paper"
-              >
-                <SkipForward className="h-4 w-4 fill-current" />
-              </button>
-            </div>
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <span className="flex-none font-mono text-[10.5px] text-muted tabular-nums">
-              {formatMs(pos)}
-            </span>
-            <div
-              className="flex-1 cursor-pointer [@media(hover:none)]:-my-3 [@media(hover:none)]:py-3"
-              onClick={(e) => {
-                if (current.duration_ms <= 0) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                const ratio = (e.clientX - rect.left) / rect.width;
-                void roomStore.seek(Math.round(ratio * current.duration_ms)).catch(() => {});
-              }}
-            >
-              {/* 触摸端热区由外层 padding 扩到 27px，视觉轨道仍是 3px */}
-              <div className="h-[3px] overflow-hidden rounded bg-[var(--rail)]">
-                <div className="progress-glide h-full rounded bg-accent" style={{ width: `${pct}%` }} />
+          {current && (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[13px]">{current.title}</div>
+                  <div className="truncate text-[11px] text-muted">{current.artist}</div>
+                </div>
+                <div className="flex flex-none items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={state.playback.preparing}
+                    title={state.playback.playing ? t('room.pause') : t('room.resume')}
+                    onClick={() =>
+                      void (state.playback.playing ? roomStore.pause() : roomStore.resume()).catch(
+                        () => {},
+                      )
+                    }
+                    className="grid h-8 w-8 place-items-center rounded-full bg-accent text-on-accent hover:brightness-105 disabled:cursor-wait disabled:opacity-50"
+                  >
+                    {state.playback.playing ? (
+                      <Pause className="h-4 w-4 fill-current" />
+                    ) : (
+                      <Play className="ml-0.5 h-4 w-4 fill-current" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    title={t('room.skip')}
+                    onClick={() => void roomStore.skip().catch(() => {})}
+                    className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-[var(--hover)] hover:text-paper"
+                  >
+                    <SkipForward className="h-4 w-4 fill-current" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <span className="flex-none font-mono text-[10.5px] text-muted tabular-nums">
-              {formatMs(current.duration_ms)}
-            </span>
-          </div>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="flex-none font-mono text-[10.5px] text-muted tabular-nums">
+                  {formatMs(pos)}
+                </span>
+                <div
+                  className="flex-1 cursor-pointer [@media(hover:none)]:-my-3 [@media(hover:none)]:py-3"
+                  onClick={(e) => {
+                    if (current.duration_ms <= 0) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const ratio = (e.clientX - rect.left) / rect.width;
+                    void roomStore.seek(Math.round(ratio * current.duration_ms)).catch(() => {});
+                  }}
+                >
+                  {/* 触摸端热区由外层 padding 扩到 27px，视觉轨道仍是 3px */}
+                  <div className="h-[3px] overflow-hidden rounded bg-[var(--rail)]">
+                    <div className="progress-glide h-full rounded bg-accent" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+                <span className="flex-none font-mono text-[10.5px] text-muted tabular-nums">
+                  {formatMs(current.duration_ms)}
+                </span>
+              </div>
+            </>
+          )}
+          <RoomVolumeControl roomId={currentId} />
         </div>
       )}
       {currentId && (

@@ -695,3 +695,8 @@ export interface OidcConfig {
   client_id: string;
   client_ids?: string[];
 }
+
+export interface UnifiedAuthConfig {
+  login_url: string;
+  browser_login?: boolean;
+}

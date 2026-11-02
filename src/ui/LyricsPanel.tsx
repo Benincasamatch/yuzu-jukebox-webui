@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { memo, useEffect, useRef, useState, type JSX } from 'react';
 import type { LyricLine } from '../player/lyrics';
 
 /**
@@ -17,7 +17,7 @@ const normalizeGlyphs = (text: string): string =>
  * （零重排的状态信号），滚动停止 5s 后自动恢复跟踪并平滑滚回当前行。
  * 高度由父容器决定（h-full）。
  */
-export function LyricsPanel(props: {
+export const LyricsPanel = memo(function LyricsPanel(props: {
   lines: LyricLine[];
   activeIndex: number;
   emptyText: string;
@@ -31,6 +31,8 @@ export function LyricsPanel(props: {
   // 跟踪态：false = 用户正在手动浏览（滚动停止 5s 后自动恢复）
   const [following, setFollowing] = useState(true);
   const holdTimerRef = useRef<number | null>(null);
+  const listRef = useRef<HTMLOListElement | null>(null);
+  const hasPositioned = useRef(false);
 
   // wheel/touchmove 只由真实用户滚动触发；scrollIntoView 的程序化滚动不会走到这里
   const noteUserScroll = () => {
@@ -54,10 +56,15 @@ export function LyricsPanel(props: {
     }
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    activeLine.scrollIntoView({
-      behavior: reduceMotion ? 'auto' : 'smooth',
-      block: 'center',
+    const list = listRef.current;
+    if (!list) return;
+    const listBox = list.getBoundingClientRect();
+    const lineBox = activeLine.getBoundingClientRect();
+    list.scrollTo({
+      top: list.scrollTop + lineBox.top - listBox.top - (list.clientHeight - lineBox.height) / 2,
+      behavior: reduceMotion || !hasPositioned.current ? 'auto' : 'smooth',
     });
+    hasPositioned.current = true;
   }, [activeIndex, following]);
 
   if (lines.length === 0) {
@@ -72,6 +79,7 @@ export function LyricsPanel(props: {
 
   return (
     <ol
+      ref={listRef}
       onWheel={noteUserScroll}
       onTouchMove={noteUserScroll}
       className={`no-scrollbar h-full overflow-y-auto overscroll-contain [mask-image:linear-gradient(to_bottom,transparent,black_18%,black_82%,transparent)] ${
@@ -114,7 +122,7 @@ export function LyricsPanel(props: {
               lineRefs.current[index] = element;
             }}
             aria-current={active ? 'true' : undefined}
-            className={`py-2.5 transition-colors duration-[var(--speed)] ${
+            className={`lyrics-line py-2.5 transition-colors duration-[var(--speed)] ${
               align === 'left' ? 'pr-6 pl-0' : 'px-6'
             }`}
           >
@@ -129,4 +137,4 @@ export function LyricsPanel(props: {
       <li aria-hidden className="h-[38%]" />
     </ol>
   );
-}
+});

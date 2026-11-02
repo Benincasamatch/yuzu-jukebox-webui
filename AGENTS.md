@@ -25,7 +25,7 @@ src/
                页面=Home 漫游/Search/PlaylistDetail/RoomDeepLink）+ admin/
   i18n/        i18next 初始化 + zh-CN 文案目录
   design/      视觉稿 mockup.html（yuzutify 前的旧设计参照；当前设计参照 =
-               Spotify Web 播放器视觉语言，见「交互架构」节）
+               Apple HIG / Apple Music 的 Web 适配，见「交互架构」节）
 ```
 
 交互架构（Phase E 起）：**登录后着陆 = 播放器外壳**，房间是状态而非页面——
@@ -35,9 +35,9 @@ src/
 播放接线（renderer.render/Media Session/自动播放解锁/canControl 查询）常驻
 AppShell，页面切换不影响出声。
 
-桌面外壳（yuzutify 起）= Spotify Web 视觉复刻：全局 TopBar（主页钮+胶囊搜索+
+桌面外壳（Apple HIG 改版）= 系统字体、语义色板、侧栏固定导航：全局 TopBar（主页钮+胶囊搜索+
 管理/主题/账户）、左曲库栏、主面板、**右侧通用面板槽位**、底部播放栏；
-面板间 8px 黑缝分隔（壳 `p-2 gap-2`，无 border）。槽位状态机
+内容面板使用细分隔线；5px 栏间拖拽热区保留宽度持久化。槽位状态机
 （`shell/state.ts`，单源 `rightPanel`）：**Now Playing 是常驻默认态**，
 queue/rooms 打开时原位叠加、关闭回到 Now Playing；Now Playing 无播放控件
 入口，其「关闭」= 折叠为右侧细轨（悬停左缘外探、半透明预览、点击展开）。
@@ -54,6 +54,9 @@ queueOpen/roomsOpen/nowPlayingOpen 均为派生态，移动端抽屉/弹层共�
   **判断是否该出声只看 should_be 的正负，不看 `playing`**。AudioRenderer 在窗口内装载并
   停在 0 待命、用 setTimeout 到点 play()（新状态/离房一律 cancel），DriftCorrector 在窗口内
   既不 seek 也不学基线；所有渲染点（进度条/时间文本/歌词/大厅 now_playing）钳到 0。
+- **`preparing=true` 是本地 Player 同步起播屏障**：此时 `current/stream_url` 已可用，
+  但房间时间线冻结在 0；Web 必须预载并保持静默。等待服务端后续广播
+  `preparing=false, playing=true` 与负 position 窗口后，再按既有定时起播逻辑开声。
 - **对齐是纯 seek，不调速**（spec §2.2/§9.2，与 yuzu-agent 一致）：`|偏差| > 150ms` →
   seek 到 `should_be + drift_baseline`（基线随即作废重学），`≤ 150ms` 不动。
   变速会改变音高与听感，代价高于一次跳转——`playbackRate` 不参与同步，
@@ -84,17 +87,26 @@ queueOpen/roomsOpen/nowPlayingOpen 均为派生态，移动端抽屉/弹层共�
   解析也常撞不到实体。路由参数 react-router 已解码，页面不得再
   `decodeURIComponent`（含 `%` 的艺人名会双重解码抛 URIError 整树白屏）。
 
-## 主题系统（三条正交轴）
+## 主题系统（三条正交轴 + 可选皮肤）
 
-yuzutify 起默认配色 = Spotify 风：深色板纯黑基底 + `#121212` 面板、accent 默认
-`#1DB954`（config.js 可覆盖，用户本机选择优先）；YIQ 阈值 120 使绿落到深色
-`--on-accent`。无衬线（--font-display 与 body 同 sans 族，标题靠字重分层）。
+Apple HIG 改版配色：深色基底 `#161618` / 面板 `#1C1C1E`，浅色基底
+`#F2F2F7` / 白色面板；accent 内置 `#D92D48`（config.js 可覆盖，用户本机
+选择优先）；YIQ 阈值 120 使浅亮强调色使用深色 `--on-accent`。无衬线（--font-display 与 body 同 sans 族，标题靠字重分层）。
 
 1. `scheme`：深/浅基底色板，`<html data-scheme>` 切换，localStorage `yuzu-scheme`
    锁定，内置默认深色（不跟随系统）；index.html 有首帧前内联脚本防刷白。
 2. `accent`：用户主题色，只写 `--accent`，派生靠 `color-mix`，`--on-accent`
    按 YIQ 亮度计算（`app/theme.ts`），localStorage `yuzu-accent`。
 3. `glow`：封面取色（`ui/glow.ts`），只作用于舞台辉光，与前两轴物理隔离。
+
+可选 `skin` 为 `default` / `scarlet`（`app/skin.ts`，localStorage `yuzu-skin`，
+`<html data-skin>`）；独立于普通 scheme/accent，红魔馆使用专属夜色色板，退出
+恢复原用户配色。`styles/scarlet.css` 的 skin 选择器覆盖 token，不改基础主题。
+`ScarletSkin` 的时停意象仅通过边角覆盖的静止钟表、飞刀 SVG 点缀表达，无独立
+展示区、按钮或时停状态；不得暂停音频、同步时钟、进度或歌词。固定装饰层
+portal 到 body，pointer-events: none。
+入口在桌面 ThemeControls / 移动账户菜单共用的 ThemeContent。原生系统栏按
+有效外观同步（红魔馆固定 dark），首帧脚本恢复皮肤。
 
 Tailwind v4 经 `@theme inline` 映射 token（bg-hall/text-paper/text-muted/text-faint/
 bg-accent/text-on-accent 等），改配色只动 `styles/tokens.css`。
@@ -270,3 +282,28 @@ onNewIntent → App 插件 `appUrlOpen` 事件 → App.tsx 处理；授权页经
   Console 表单提示「自定义协议或 loopback」属规范引导，非运行时拒绝）。
 - 若某服务器另有 Web 专用 User-Agent 应用，其 id 加入服务端
   `oidc.extra_client_ids`（aud 验签放行），WebUI 仍默认用主 id。
+
+前端展示策略：已删除「随便听听」区块；`ui/radioSources.ts` 的
+`isVisibleRadioSource` 统一隐藏 provider 的 `fm` / `heart` 源，首页、榜单、
+集合页路由和电台按钮共用。不得因此删除后端能力或停止真实房间播放。
+已运行的隐藏来源仍在队列显示通用电台状态与停止按钮。
+
+网页个人播放默认关闭跟随，Cookie `yuzu-web-follow` 持久化（`app/webFollow.ts`）。
+`app/player.ts` 给共享 AudioRenderer 注入初始暂停、跨房保留及偏好回调，
+所有个人暂停／恢复入口同步 Cookie；原生不使用这项浏览器偏好。不得用
+房间 pause/resume 实现网页跟随开关，也不得在空闲或换房时重置浏览器选择。
+房间音量复用 `ui/RoomVolumeControl.tsx`，首页与房间面板共用，和本地音量分开。
+
+全屏性能约束：仅按当前断点挂载一套视图；不要恢复全视口多层 blur 背景。
+进入动画先用普通封面，高清封面与歌词在展开后加载；手机歌词首次切换才挂载。
+歌词 memo 化，列表仅滚动自身；关闭回调稳定，不能因每秒进度更新重装滚动锁。
+红魔馆装饰提高不透明度与笔画后仍保持 pointer-events:none，全屏覆盖期间
+装饰层提高至 z-51，维持静态 SVG，不引入滤镜或交互特效。
+
+Android 更新发布：默认独立 HTTPS 清单 `music.102.yuna.team/app-updates/latest.json`；
+`app/androidUpdate.ts` 校验包名、递增版本及同源 APK 地址，原生 HTTP 避免 WebView CORS。
+`AndroidUpdatePrompt` 启动检查和手动检查不依赖登录；不得引入静默安装或清除应用数据。
+网页顶部 `AppDownloadLink` 指向 latest.apk。分发文件在 `releases/android/`，构建后
+通过 scripts/restore-android-updates.mjs 恢复至 dist/app-updates；Android aapt
+ignoreAssetsPattern 排除该目录，必须核对 APK 无嵌套下载包。旧版 APK 证书与
+新包一致才能声称支持覆盖更新；检查正式域名下载内容后再报告分发地址可用。

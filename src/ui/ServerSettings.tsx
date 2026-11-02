@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NATIVE_SERVER_KEY, httpBase } from '../config';
+import { NATIVE_SERVER_KEY, httpBase, defaultHttpBase } from '../config';
 import { isNativeApp } from '../app/nativemedia';
 import { Dialog } from './primitives';
+import { BROWSER_LOGIN_KEY } from '../auth/browser';
 
-const SESSION_KEYS = ['yuzu-session', 'yuzu-room-credentials', 'yuzu-last-room'] as const;
+const SESSION_KEYS = ['yuzu-session', 'yuzu-room-credentials', 'yuzu-last-room', BROWSER_LOGIN_KEY] as const;
 
 interface ServerAddressEditorProps {
   onCancel?: () => void;
@@ -38,7 +39,9 @@ function NativeServerAddressEditor({ onCancel }: ServerAddressEditorProps) {
       localStorage.removeItem(NATIVE_SERVER_KEY);
     }
 
-    for (const key of SESSION_KEYS) localStorage.removeItem(key);
+    if ((next.replace(/\/+$/, '') || defaultHttpBase) !== httpBase) {
+      for (const key of SESSION_KEYS) localStorage.removeItem(key);
+    }
     location.reload();
   };
 

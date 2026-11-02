@@ -85,6 +85,7 @@ interface PlaybackOptions {
   positionMs?: number;
   updatedAt?: number;
   rate?: number;
+  preparing?: boolean;
 }
 
 function makePlayback({
@@ -94,6 +95,7 @@ function makePlayback({
   positionMs = 10_000,
   updatedAt = 1_000,
   rate = 1,
+  preparing = false,
 }: PlaybackOptions = {}): Playback {
   return {
     current: trackRef === null
@@ -112,6 +114,7 @@ function makePlayback({
     updated_at: updatedAt,
     playing,
     rate,
+    preparing,
   };
 }
 
@@ -123,6 +126,26 @@ function makeRenderer(audio: FakeAudio, clock: FakeClock): AudioRenderer {
 }
 
 describe('AudioRenderer', () => {
+  it('preloads silently during the player-ready barrier, then follows the scheduled start', () => {
+    vi.useFakeTimers();
+    const audio = new FakeAudio();
+    audio.readyState = 4;
+    const clock = new FakeClock(1_000);
+    const renderer = makeRenderer(audio, clock);
+
+    renderer.render(makePlayback({ playing: false, positionMs: 0, preparing: true }));
+    expect(audio.loadCalls).toBe(1);
+    expect(audio.paused).toBe(true);
+    expect(audio.playCalls).toBe(0);
+
+    renderer.render(makePlayback({ playing: true, positionMs: -600, updatedAt: 1_000 }));
+    expect(audio.playCalls).toBe(0);
+    clock.now = 1_600;
+    vi.advanceTimersByTime(600);
+    expect(audio.playCalls).toBe(1);
+    vi.useRealTimers();
+  });
+
   it('loads a relative stream URL and performs one fresh initial seek when metadata is ready', () => {
     const audio = new FakeAudio();
     audio.readyState = 4;
@@ -509,5 +532,62 @@ describe('AudioRenderer start-lead window', () => {
     renderer.resumeAfterGesture();
     expect(audio.playCalls).toBe(2);
     expect(audio.paused).toBe(false);
+  });
+});
+
+describe('browser persistent follow preference', () => {
+  it('stays silent across empty states, room changes, new tracks and unrelated gestures until opted in', () => {
+    const audio = new FakeAudio();
+    const clock = new FakeClock(2_000);
+    const renderer = new AudioRenderer(audio as unknown as HTMLAudioElement, clock as unknown as ClockSync, undefined, {
+      initiallyPaused: true,
+      preserveAcrossRooms: true,
+    });
+    renderer.render(makePlayback());
+    renderer.resumeAfterGesture();
+    renderer.render(makePlayback({ trackRef: null }));
+    renderer.render(makePlayback({ trackRef: 'local:two' }));
+    renderer.resumeAfterGesture();
+    expect(renderer.isPersonalPaused).toBe(true);
+    expect(audio.playCalls).toBe(0);
+    expect(audio.paused).toBe(true);
+  });
+
+  it('notifies preference changes and aligns to the live room on explicit opt-in', () => {
+    const audio = new FakeAudio();
+    const clock = new FakeClock(4_000);
+    const changed = vi.fn();
+    const renderer = new AudioRenderer(audio as unknown as HTMLAudioElement, clock as unknown as ClockSync, undefined, {
+      initiallyPaused: true,
+      preserveAcrossRooms: true,
+      onChange: changed,
+    });
+    renderer.render(makePlayback({ positionMs: 10_000, updatedAt: 1_000 }));
+    renderer.resumePersonal();
+    expect(audio.playCalls).toBe(1);
+    expect(audio.seekWrites.at(-1)).toBe(13);
+    expect(changed).toHaveBeenLastCalledWith(false);
+    renderer.pausePersonal();
+    expect(changed).toHaveBeenLastCalledWith(true);
+    renderer.render(makePlayback({ trackRef: null }));
+    renderer.render(makePlayback());
+    expect(renderer.isPersonalPaused).toBe(true);
+    expect(audio.playCalls).toBe(1);
+  });
+
+  it('does not arm scheduled start while following is off', () => {
+    vi.useFakeTimers();
+    try {
+      const audio = new FakeAudio();
+      const clock = new FakeClock(1_000);
+      const renderer = new AudioRenderer(audio as unknown as HTMLAudioElement, clock as unknown as ClockSync, undefined, {
+        initiallyPaused: true,
+        preserveAcrossRooms: true,
+      });
+      renderer.render(makePlayback({ positionMs: -600, updatedAt: 1_000 }));
+      clock.now += 1_000;
+      vi.advanceTimersByTime(1_000);
+      expect(audio.playCalls).toBe(0);
+    } finally { vi.useRealTimers(); }
   });
 });

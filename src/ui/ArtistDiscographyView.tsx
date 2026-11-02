@@ -7,11 +7,12 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Disc3, Play } from 'lucide-react';
+import { ChevronLeft, Disc3 } from 'lucide-react';
 import type { SearchEntity, SearchTrack } from '../api/types';
 import { api } from '../app/session';
 import { coverSrc } from './cover';
-import { TrackList, searchTrackToRow, useEnqueue } from './TrackList';
+import { TrackList, searchTrackToRow } from './TrackList';
+import { AlbumPlayControls } from './AlbumPlayControls';
 import { useToast } from './toast';
 
 const PAGE_SIZE = 50;
@@ -79,7 +80,6 @@ export default function ArtistDiscographyView(): JSX.Element {
 function AlbumSection({ provider, album }: { provider: string; album: SearchEntity }): JSX.Element {
   const { t } = useTranslation();
   const { showError } = useToast();
-  const enqueue = useEnqueue();
   const [tracks, setTracks] = useState<SearchTrack[] | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
   const entityId = album.entity_id;
@@ -123,16 +123,13 @@ function AlbumSection({ provider, album }: { provider: string; album: SearchEnti
         <div className="min-w-0 flex-1 pb-1">
           <h2 className="truncate text-xl font-bold text-paper md:text-2xl">{album.name}</h2>
           {album.detail && <div className="mt-1 text-[13px] text-muted">{album.detail}</div>}
-          <button
-            type="button"
-            disabled={!tracks || tracks.length === 0}
-            onClick={() => enqueue((tracks ?? []).map((track) => track.track_ref))}
-            title={t('artistPage.addAll')}
-            aria-label={t('artistPage.addAll')}
-            className="mt-3 grid h-10 w-10 place-items-center rounded-full bg-accent text-on-accent transition hover:scale-105 hover:brightness-105 disabled:opacity-40 disabled:hover:scale-100"
-          >
-            <Play className="ml-0.5 h-4 w-4 fill-current" aria-hidden="true" />
-          </button>
+          {entityId && (
+            <AlbumPlayControls
+              provider={provider}
+              albumId={entityId}
+              disabled={!tracks || tracks.length === 0}
+            />
+          )}
         </div>
       </div>
       {tracks === null ? (

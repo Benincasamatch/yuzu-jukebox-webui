@@ -24,6 +24,16 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('ApiClient', () => {
+  it('submits bulk queue writes through authenticated HTTP without using the playback socket', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ entry_ids: ['a', 'b'] }));
+    const client = new ApiClient(() => 'session', { base: 'https://yuzu.test', fetchFn });
+    await expect(client.addRoomQueue('room/a', ['ncm:1', 'ncm:2'])).resolves.toEqual(['a', 'b']);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://yuzu.test/api/v1/rooms/room%2Fa/queue');
+    expect(init?.method).toBe('POST');
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer session');
+    expect(JSON.parse(String(init?.body))).toEqual({ track_refs: ['ncm:1', 'ncm:2'] });
+  });
   it('sends auth JSON and only adds bearer authorization when a token exists', async () => {
     const fetchFn = vi.fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse({ identity, session_token: 'session' }))
@@ -49,6 +59,29 @@ describe('ApiClient', () => {
       access_token: 'access-token',
     });
     expect(new Headers(oidcInit?.headers).get('Authorization')).toBe('Bearer current-token');
+  });
+  it('discovers unified auth and exchanges its HttpOnly cookie with credentials included', async () => {
+    const unifiedIdentity = { ...identity, id: 'u102_alice', kind: 'unified' as const };
+    const fetchFn = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ login_url: 'https://102.yuna.team/UnifiedAuth/' }))
+      .mockResolvedValueOnce(jsonResponse({ identity: unifiedIdentity, session_token: 'unified-session' }));
+    const client = new ApiClient(() => null, { base: 'https://music.102.yuna.team', fetchFn });
+
+    await expect(client.unifiedAuthConfig()).resolves.toEqual({
+      login_url: 'https://102.yuna.team/UnifiedAuth/',
+    });
+    await expect(client.unifiedAuth()).resolves.toEqual({
+      identity: unifiedIdentity,
+      session_token: 'unified-session',
+    });
+
+    expect(fetchFn.mock.calls[0][0]).toBe(
+      'https://music.102.yuna.team/api/v1/auth/unified/config',
+    );
+    const [url, init] = fetchFn.mock.calls[1];
+    expect(url).toBe('https://music.102.yuna.team/api/v1/auth/unified');
+    expect(init?.method).toBe('POST');
+    expect(init?.credentials).toBe('include');
   });
   it('issues an external binding code with the current OIDC session and no request body', async () => {
     const issued = { code: '7K3M-9P2D-X4RT', expires_at: 1_720_000_600_000 };

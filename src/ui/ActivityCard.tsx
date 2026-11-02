@@ -1,6 +1,6 @@
 /**
  * 封面卡（首页 shelf 横排行与 /shelf 全览页共用）：默认无底色，
- * hover 整卡亮起（Spotify 同款）+ 封面浮现 inset 描边与播放大钮。
+ * hover 整卡亮起+ 封面浮现 inset 描边与播放大钮。
  * 整卡点击 = 入队。宽度由外层容器控制（行内 w-[180px]，网格内自适应）。
  */
 import { type JSX } from 'react';
@@ -30,9 +30,9 @@ export function ActivityCard({
       type="button"
       title={t('search.add')}
       onClick={() => enqueue([trackRef], title)}
-      className={`group block rounded-lg p-3 text-left transition-colors hover:bg-panel-2 ${className ?? 'w-full'}`}
+      className={`music-card group flex flex-col items-stretch justify-start snap-start rounded-2xl p-2 text-left transition-colors hover:bg-panel-2 ${className ?? 'w-full'}`}
     >
-      <div className="relative aspect-square w-full rounded-md transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--rail)]">
+      <div className="relative aspect-square w-full flex-none rounded-md transition-shadow group-hover:shadow-[inset_0_0_0_1px_var(--rail)]">
         <CoverThumb
           src={coverSrc(`/api/v1/cover/${encodeURIComponent(trackRef)}`)}
           alt={title}

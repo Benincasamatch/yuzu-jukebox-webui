@@ -11,6 +11,7 @@ import { ChevronLeft, Home, Library, Search } from 'lucide-react';
 import { useConnStatus } from './hooks';
 import { ShellContext } from './shellContext';
 import { useShellState } from './shell/state';
+import { AppDownloadLink } from './AppDownloadLink';
 import { AccountMenu } from './AccountMenu';
 import { BatteryOptBanner } from './BatteryOptBanner';
 import { MobilePlayerBar } from './MobilePlayerBar';
@@ -46,7 +47,7 @@ export default function MobileShell() {
 
   return (
     <ShellContext.Provider value={value}>
-      <div className="flex h-dvh flex-col">
+      <div className="app-mobile flex h-dvh flex-col">
         {(status === 'reconnecting' || status === 'offline') && (
           <div className="bg-accent-soft py-1 text-center text-[12.5px] text-accent">
             {t(status === 'offline' ? 'conn.offline' : 'conn.reconnecting')}
@@ -90,6 +91,7 @@ export default function MobileShell() {
                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
               </button>
             )}
+            <div className="pointer-events-auto"><AppDownloadLink /></div>
             <div className="flex-1" />
             <div className="pointer-events-auto">
               <AccountMenu compact themeInMenu onRoomsClick={() => value.setRoomsOpen(true)} />
@@ -100,7 +102,7 @@ export default function MobileShell() {
               悬浮播放条 + TabBar 叠在壳底色上 */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0">
             <div className="h-10 bg-gradient-to-b from-transparent to-hall" />
-            <div className="pointer-events-auto bg-hall">
+            <div className="mobile-chrome pointer-events-auto">
               <MobilePlayerBar />
               <MobileTabBar />
             </div>
@@ -119,12 +121,12 @@ export default function MobileShell() {
 function MobileTabBar() {
   const { t } = useTranslation();
   const tabClass = ({ isActive }: { isActive: boolean }) =>
-    `flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[10.5px] transition-colors ${
+    `flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] font-medium transition-colors ${
       isActive ? 'text-accent' : 'text-muted'
     }`;
 
   return (
-    <nav className="flex flex-none pb-[env(safe-area-inset-bottom)] md:hidden">
+    <nav className="mobile-tabs flex flex-none pb-[env(safe-area-inset-bottom)] md:hidden">
       <NavLink to="/" end className={tabClass}>
         <Home className="h-5 w-5" />
         {t('shell.navHome')}

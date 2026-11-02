@@ -4,7 +4,10 @@
  */
 import { ApiClient } from '../api/client';
 import { createOidcFlow } from '../auth/oidc';
+import { createBrowserLoginFlow } from '../auth/browser';
+import { httpBase } from '../config';
 import { createSessionTokenStore } from '../auth/token';
+import { createSessionRestorer, isSessionRejected } from '../auth/restore';
 import { createRoomCredentialStore } from '../auth/roomCredentials';
 import { YuzuClient } from '../protocol/client';
 import { SessionStore } from '../protocol/store';
@@ -76,13 +79,22 @@ client.onSessionReset(async () => {
     const auth = await client.authToken(token);
     setIdentity(auth.identity);
     if (lastRoom) await roomStore.join(lastRoom.id, lastRoom.password);
-  } catch {
+  } catch (error) {
+    if (isSessionRejected(error) && tokenStore.get() === token) {
+      tokenStore.clear();
+      setIdentity(null);
+    }
     // 恢复失败：保持重连循环，下一轮再试
   }
 });
 
 // ---------- 会话操作 ----------
-let bootPromise: Promise<boolean> | null = null;
+const restoreSession = createSessionRestorer({
+  tokens: tokenStore,
+  connect: () => client.connect(),
+  authenticate: async (token) => (await client.authToken(token)).identity,
+  onIdentity: setIdentity,
+});
 
 export const session = {
   getIdentity: () => identity,
@@ -96,19 +108,7 @@ export const session = {
 
   /** 启动恢复：有 token 则直连 + WS 认证；幂等（StrictMode 双调安全）。 */
   boot(): Promise<boolean> {
-    bootPromise ??= (async () => {
-      const token = tokenStore.get();
-      if (!token) return false;
-      try {
-        await client.connect();
-        setIdentity((await client.authToken(token)).identity);
-        return true;
-      } catch {
-        tokenStore.clear();
-        return false;
-      }
-    })();
-    return bootPromise;
+    return restoreSession();
   },
 
   async loginGuest(name: string, password?: string): Promise<void> {
@@ -116,6 +116,20 @@ export const session = {
     tokenStore.set(auth.session_token);
     await client.connect();
     setIdentity((await client.authToken(auth.session_token)).identity);
+  },
+
+  async loginUnified(): Promise<void> {
+    const auth = await api.unifiedAuth();
+    tokenStore.set(auth.session_token);
+    await client.connect();
+    setIdentity((await client.authToken(auth.session_token)).identity);
+  },
+
+  async loginBrowser(code: string, verifier: string): Promise<void> {
+    const auth = await api.browserAuthExchange(code, verifier);
+    tokenStore.set(auth.session_token);
+    // Finish the one-time code exchange before attempting WS recovery. If the
+    // network drops now, keep the issued token instead of redeeming the code again.
   },
 
   async loginOidc(idToken: string, accessToken?: string): Promise<void> {
@@ -133,3 +147,10 @@ export const session = {
     setIdentity(null);
   },
 };
+
+export const browserLoginFlow = isNativeApp ? createBrowserLoginFlow({
+  server: httpBase,
+  storage: localStorage,
+  open: (url) => Browser.open({ url }),
+  exchange: (code, verifier) => session.loginBrowser(code, verifier),
+}) : null;

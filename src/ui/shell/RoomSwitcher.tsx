@@ -32,7 +32,7 @@ export function RoomSwitcher(): JSX.Element {
       <MonitorSpeaker className="h-4 w-4 flex-none" />
       <span className="min-w-0 flex-1">
         <span className="block truncate">
-          {currentId ? (currentRoom?.name ?? currentId) : t('shell.selectRoom')}
+          {currentId ? (currentRoom?.name ?? currentId) : t('shell.roomSwitch')}
         </span>
         {currentId && (
           <span className="block font-mono text-[10.5px] leading-tight text-faint">
